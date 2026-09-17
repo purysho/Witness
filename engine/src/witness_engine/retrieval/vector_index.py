@@ -11,7 +11,7 @@ import sqlite3
 import struct
 from hashlib import sha256
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Sequence
 
 from .embeddings import EmbeddingProvider, Vector, normalize
 from .models import RetrievalCandidate
@@ -91,35 +91,6 @@ class LocalVectorIndex:
             ).fetchone()
         return int(row[0])
 
-    def _pending_rows(
-        self,
-        provider_id: str,
-        *,
-        source_version_id: str | None = None,
-    ) -> list[sqlite3.Row]:
-        params: list[str] = [provider_id]
-        source_clause = ""
-        if source_version_id is not None:
-            source_clause = "AND c.source_version_id = ?"
-            params.append(source_version_id)
-
-        rows = self.connection.execute(
-            f"""
-            SELECT c.chunk_id, c.text
-            FROM indexed_chunks AS c
-            LEFT JOIN chunk_embeddings AS e
-              ON e.chunk_id = c.chunk_id AND e.provider_id = ?
-            WHERE (
-                e.chunk_id IS NULL
-                OR e.text_sha256 != lower(hex(sha3_256(c.text)))
-            )
-            {source_clause}
-            ORDER BY c.chunk_id
-            """,
-            tuple(params),
-        ).fetchall()
-        return rows
-
     def sync(
         self,
         provider: EmbeddingProvider,
@@ -127,11 +98,10 @@ class LocalVectorIndex:
         source_version_id: str | None = None,
         batch_size: int = 64,
     ) -> int:
-        """Embed missing/stale chunks from the provenance table.
+        """Embed missing or stale chunks from the provenance table."""
+        if batch_size < 1:
+            raise ValueError("batch_size must be >= 1")
 
-        SQLite builds do not consistently expose sha3_256(), so freshness is
-        checked in Python rather than relying on an extension function.
-        """
         query = "SELECT chunk_id, text FROM indexed_chunks"
         params: tuple[str, ...] = ()
         if source_version_id is not None:
