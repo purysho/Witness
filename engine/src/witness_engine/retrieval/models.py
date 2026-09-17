@@ -5,8 +5,9 @@ from dataclasses import dataclass
 class RetrievalCandidate:
     """A retriever output before reranking or answer generation.
 
-    Candidates intentionally preserve provenance. Retrieval results are evidence
-    candidates, not final answers.
+    Candidates preserve enough provenance to walk from a ranked hit back to the
+    immutable source version and its original locator. Retrieval results are
+    evidence candidates, not final answers.
     """
 
     chunk_id: str
@@ -14,3 +15,6 @@ class RetrievalCandidate:
     score: float
     rank: int
     method: str
+    source_version_id: str = ""
+    locator: str = ""
+    block_id: str = ""
