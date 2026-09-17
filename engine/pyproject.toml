@@ -1,0 +1,9 @@
+[project]
+name = "witness-engine"
+version = "0.1.0"
+description = "Evidence-first RAG engine"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
