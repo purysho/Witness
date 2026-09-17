@@ -3,7 +3,13 @@
 Phase 2 begins with deterministic lexical retrieval before dense retrieval.
 """
 
-from .models import RetrievalCandidate
+from .index import EvidenceIndexError, LocalEvidenceIndex
 from .lexical import LexicalRetriever
+from .models import RetrievalCandidate
 
-__all__ = ["RetrievalCandidate", "LexicalRetriever"]
+__all__ = [
+    "EvidenceIndexError",
+    "LocalEvidenceIndex",
+    "RetrievalCandidate",
+    "LexicalRetriever",
+]
