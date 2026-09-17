@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from .chunking import chunk_block
@@ -10,11 +11,14 @@ from .ids import file_sha256, stable_id
 from .ingestion.registry import extract_document
 from .retrieval.adaptive import AdaptiveRetrievalResult, RoutedRetriever
 from .retrieval.embeddings import EmbeddingProvider
+from .retrieval.graph import LocalEvidenceGraph
+from .retrieval.hierarchical import LocalHierarchyIndex
 from .retrieval.hybrid import HybridRetrievalResult, HybridRetriever
 from .retrieval.index import LocalEvidenceIndex
 from .retrieval.models import RetrievalCandidate
 from .retrieval.rerank import RerankProvider
 from .retrieval.routing import TransparentRetrievalRouter
+from .retrieval.temporal import LocalTemporalIndex
 from .retrieval.vector_index import LocalVectorIndex
 
 
@@ -28,6 +32,7 @@ class IndexingResult:
     media_type: str
     warnings: tuple[str, ...] = ()
     embedded_chunk_count: int = 0
+    claim_edge_count: int = 0
 
 
 def index_document(
@@ -37,11 +42,13 @@ def index_document(
     max_chars: int = 1200,
     vector_index: LocalVectorIndex | None = None,
     embedding_provider: EmbeddingProvider | None = None,
+    valid_from: str | datetime | None = None,
 ) -> IndexingResult:
     """Extract, chunk, and index any supported local document.
 
-    Dense indexing is optional. When enabled, both the vector index and
-    embedding provider must be supplied so the embedding identity is explicit.
+    In addition to lexical evidence, every import now records document hierarchy,
+    source-version temporal metadata, and deterministic claim/evidence edges.
+    Dense indexing remains optional and provider-explicit.
     """
     if (vector_index is None) != (embedding_provider is None):
         raise ValueError(
@@ -69,6 +76,24 @@ def index_document(
 
     index.index_chunks(rows)
 
+    hierarchy = LocalHierarchyIndex(index)
+    hierarchy.index_document(document)
+
+    stat = source_path.stat()
+    observed_at = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+    temporal = LocalTemporalIndex(index)
+    temporal.register_source_version(
+        source_version_id=source_version_id,
+        source_path=source_path,
+        title=document.title,
+        media_type=document.media_type,
+        observed_at=observed_at,
+        valid_from=valid_from or observed_at,
+    )
+
+    evidence_graph = LocalEvidenceGraph(index)
+    claim_edge_count = evidence_graph.index_chunks(rows)
+
     embedded_chunk_count = 0
     if vector_index is not None and embedding_provider is not None:
         embedded_chunk_count = vector_index.sync(
@@ -85,6 +110,7 @@ def index_document(
         media_type=document.media_type,
         warnings=document.warnings,
         embedded_chunk_count=embedded_chunk_count,
+        claim_edge_count=claim_edge_count,
     )
 
 
@@ -95,6 +121,7 @@ def index_text_document(
     max_chars: int = 1200,
     vector_index: LocalVectorIndex | None = None,
     embedding_provider: EmbeddingProvider | None = None,
+    valid_from: str | datetime | None = None,
 ) -> IndexingResult:
     """Backward-compatible name for the original Phase 2 text pipeline."""
 
@@ -104,6 +131,7 @@ def index_text_document(
         max_chars=max_chars,
         vector_index=vector_index,
         embedding_provider=embedding_provider,
+        valid_from=valid_from,
     )
 
 
@@ -155,7 +183,7 @@ def search_routed_evidence(
     router: TransparentRetrievalRouter | None = None,
     reranker: RerankProvider | None = None,
 ) -> AdaptiveRetrievalResult:
-    """Plan routes, retrieve, fuse when needed, rerank, and return full Trace data."""
+    """Plan all executable routes, fuse, rerank, and return full Trace data."""
 
     return RoutedRetriever(
         lexical_index,
