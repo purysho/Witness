@@ -8,10 +8,13 @@ from pathlib import Path
 from .chunking import chunk_block
 from .ids import file_sha256, stable_id
 from .ingestion.registry import extract_document
+from .retrieval.adaptive import AdaptiveRetrievalResult, RoutedRetriever
 from .retrieval.embeddings import EmbeddingProvider
 from .retrieval.hybrid import HybridRetrievalResult, HybridRetriever
 from .retrieval.index import LocalEvidenceIndex
 from .retrieval.models import RetrievalCandidate
+from .retrieval.rerank import RerankProvider
+from .retrieval.routing import TransparentRetrievalRouter
 from .retrieval.vector_index import LocalVectorIndex
 
 
@@ -135,5 +138,35 @@ def search_hybrid_evidence(
         query,
         limit=limit,
         candidate_pool=candidate_pool,
+        rrf_k=rrf_k,
+    )
+
+
+def search_routed_evidence(
+    query: str,
+    lexical_index: LocalEvidenceIndex,
+    vector_index: LocalVectorIndex,
+    embedding_provider: EmbeddingProvider,
+    *,
+    limit: int = 10,
+    candidate_pool: int = 30,
+    rerank_pool: int = 20,
+    rrf_k: int = 60,
+    router: TransparentRetrievalRouter | None = None,
+    reranker: RerankProvider | None = None,
+) -> AdaptiveRetrievalResult:
+    """Plan routes, retrieve, fuse when needed, rerank, and return full Trace data."""
+
+    return RoutedRetriever(
+        lexical_index,
+        vector_index,
+        embedding_provider,
+        router=router,
+        reranker=reranker,
+    ).search(
+        query,
+        limit=limit,
+        candidate_pool=candidate_pool,
+        rerank_pool=rerank_pool,
         rrf_k=rrf_k,
     )
