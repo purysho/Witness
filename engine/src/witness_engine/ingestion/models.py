@@ -15,9 +15,14 @@ class ExtractedBlock:
 
 @dataclass(frozen=True)
 class ExtractedDocument:
-    """Parser output before chunking and indexing."""
+    """Parser output before chunking and indexing.
+
+    Warnings are persisted by callers as diagnostic information; they are never
+    silently folded into evidence text.
+    """
 
     source_version_id: str
     media_type: str
     title: str
     blocks: tuple[ExtractedBlock, ...]
+    warnings: tuple[str, ...] = ()
