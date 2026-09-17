@@ -7,7 +7,7 @@ from pathlib import Path
 
 from .chunking import chunk_block
 from .ids import file_sha256, stable_id
-from .ingestion.plain_text import extract_text_file
+from .ingestion.registry import extract_document
 from .retrieval.index import LocalEvidenceIndex
 from .retrieval.models import RetrievalCandidate
 
@@ -19,20 +19,23 @@ class IndexingResult:
     sha256: str
     block_count: int
     chunk_count: int
+    media_type: str
+    warnings: tuple[str, ...] = ()
 
 
-def index_text_document(
+def index_document(
     path: str | Path,
     index: LocalEvidenceIndex,
     *,
     max_chars: int = 1200,
 ) -> IndexingResult:
-    """Extract, chunk, and index a local UTF-8 text document.
+    """Extract, chunk, and index any supported local document.
 
     The source-version identity changes only when either the normalized source
-    path or file bytes change. Re-indexing identical input is therefore
-    idempotent at the evidence identity layer.
+    path or file bytes change. Re-indexing identical input is idempotent at the
+    evidence identity layer.
     """
+
     source_path = Path(path).expanduser().resolve()
     if not source_path.is_file():
         raise FileNotFoundError(source_path)
@@ -43,7 +46,7 @@ def index_text_document(
         str(source_path),
         digest,
     )
-    document = extract_text_file(str(source_path), source_version_id)
+    document = extract_document(source_path, source_version_id)
 
     rows = []
     chunk_count = 0
@@ -60,7 +63,20 @@ def index_text_document(
         sha256=digest,
         block_count=len(document.blocks),
         chunk_count=chunk_count,
+        media_type=document.media_type,
+        warnings=document.warnings,
     )
+
+
+def index_text_document(
+    path: str | Path,
+    index: LocalEvidenceIndex,
+    *,
+    max_chars: int = 1200,
+) -> IndexingResult:
+    """Backward-compatible name for the original Phase 2 text pipeline."""
+
+    return index_document(path, index, max_chars=max_chars)
 
 
 def search_evidence(
@@ -70,4 +86,5 @@ def search_evidence(
     limit: int = 10,
 ) -> list[RetrievalCandidate]:
     """Search indexed local evidence without performing answer generation."""
+
     return index.search(query, limit=limit)
