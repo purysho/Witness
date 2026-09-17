@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from .embeddings import EmbeddingProvider
 from .index import LocalEvidenceIndex
@@ -35,6 +35,10 @@ class RetrievalTrace:
     embedding_provider_id: str
     rrf_k: int
     candidate_pool: int
+
+    def to_dict(self) -> dict:
+        """Return a JSON-compatible trace payload for desktop IPC/export."""
+        return asdict(self)
 
 
 @dataclass(frozen=True)
