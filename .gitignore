@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Node / desktop
+node_modules/
+apps/desktop/dist/
+apps/desktop/.vite/
+apps/desktop/src-tauri/target/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Secrets / local configuration
+.env
+.env.*
+!.env.example
+
+# Witness local workspaces and generated indexes
+*.witness/
+*.witness.zip
+.witness-dev/
+
+# Generated contracts / caches
+contracts/generated/*
+!contracts/generated/.gitkeep
+
+# Test / coverage
+.coverage
+htmlcov/
+coverage.xml
+
+# Packaging
+*.spec
+*.exe
+*.msi
+*.dmg
+*.AppImage
