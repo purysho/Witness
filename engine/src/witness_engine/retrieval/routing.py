@@ -87,6 +87,7 @@ class TransparentRetrievalRouter:
             or features.relational
             or features.broad_summary
             or features.comparison
+            or features.temporal_signals
             or not features.exact_lookup
         )
         if features.explanatory:
@@ -97,6 +98,8 @@ class TransparentRetrievalRouter:
             dense_reasons.append("broad synthesis query benefits from semantic matching")
         if features.comparison:
             dense_reasons.append("comparison query benefits from semantic matching")
+        if features.temporal_signals:
+            dense_reasons.append("temporal signal keeps semantic coverage while temporal retrieval is advisory")
         if not features.exact_lookup:
             dense_reasons.append("no exact-lookup signal; semantic retrieval retained")
 
