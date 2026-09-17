@@ -2,7 +2,7 @@
 
 The Python engine owns all evidence-domain behavior and is testable without the desktop app or network access.
 
-Current Phase 2 capabilities:
+Current capabilities:
 
 - immutable source-version and chunk identities;
 - structured local ingestion for text, Markdown, PDF, DOCX, and source code;
@@ -11,9 +11,30 @@ Current Phase 2 capabilities:
 - exact cosine search as the deterministic vector baseline;
 - BM25 + dense hybrid retrieval through Reciprocal Rank Fusion (RRF);
 - deterministic query understanding and transparent route selection;
-- explicit advisory detection for future temporal, graph, and hierarchical routes;
+- executable temporal retrieval over version-validity intervals and supersession chains;
+- executable hierarchical retrieval that expands matched evidence through document structure;
+- executable claim/evidence graph retrieval with deterministic claim extraction and entity expansion;
 - provider-neutral reranking with deterministic and optional local cross-encoder implementations;
-- serializable retrieval traces showing route reasons, lexical/dense candidates, RRF contributions, and pre/post-rerank positions.
+- serializable retrieval traces showing route reasons, specialized-route artifacts, RRF contributions, and pre/post-rerank positions.
+
+## Specialized retrieval
+
+Every import now builds several local projections from the same immutable evidence:
+
+```text
+SourceVersion
+   ├── chunks -> FTS5 / BM25
+   ├── chunks -> dense vectors
+   ├── valid_from / valid_to / supersession -> temporal index
+   ├── block parent/child structure -> hierarchy index
+   └── deterministic claims -> claim/evidence graph
+```
+
+Temporal metadata is version-aware. `index_document(..., valid_from=...)` may supply an explicit validity start; otherwise Witness records the file modification time as the baseline. Later versions of the same source path form a supersession chain without deleting earlier evidence.
+
+The graph baseline treats sentence-level propositions as claims and records explicit `claim -> supporting chunk` edges plus extracted entity anchors. This is intentionally deterministic. Future model-backed claim extraction can replace extraction while preserving the graph storage and retrieval contract.
+
+Hierarchical retrieval preserves parser structure. Markdown headings, for example, can retrieve their child paragraphs as coherent context rather than forcing every answer to rely on isolated chunks.
 
 ## Local semantic embeddings
 
@@ -44,9 +65,10 @@ with LocalEvidenceIndex("witness.sqlite3") as lexical, \
         lexical,
         vector_index=vectors,
         embedding_provider=provider,
+        valid_from="2026-09-01T00:00:00+00:00",
     )
     result = search_routed_evidence(
-        "Why was deployment delayed?",
+        "Summarize how deployment dependencies changed after 2025 across all documents",
         lexical,
         vectors,
         provider,
@@ -57,6 +79,6 @@ with LocalEvidenceIndex("witness.sqlite3") as lexical, \
     print(result.trace.to_dict())
 ```
 
-For a compact exact lookup such as `What port is "auth-api"?`, the transparent router can execute lexical retrieval alone. Explanatory, relational, comparison, broad-summary, or temporal queries retain dense retrieval. Requests that appear to need graph, temporal, or hierarchical retrieval are recorded as advisory routes in Trace until those engines exist; Witness does not pretend an unavailable route ran.
+For a compact exact lookup such as `What port is "auth-api"?`, the transparent router can execute lexical retrieval alone. Explanatory, relational, comparison, broad-summary, or temporal questions activate the relevant specialized routes. Trace records the exact route plan, temporal source selection, hierarchy expansion, claim/entity graph expansion, fusion contributions, and reranking movement.
 
 The exact vector scan is intentional at this stage. HNSW/ANN will be introduced as an optimization only after the Lab has a stable evaluation baseline that can quantify recall and latency changes.
