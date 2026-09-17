@@ -46,10 +46,9 @@ class RetrievalPlan:
 class TransparentRetrievalRouter:
     """Rule-based baseline whose decisions are reproducible and inspectable.
 
-    Lexical and dense routes are executable in the current engine. Temporal,
-    graph, and hierarchical routes are already represented as explicit advisory
-    decisions so future implementations can be added without changing the trace
-    contract.
+    V1 routes are explicit and mechanical. Lexical, dense, temporal, graph, and
+    hierarchical retrieval are all executable; the router records why each route
+    was requested instead of hiding the decision in a model call.
     """
 
     def plan(self, query: str) -> RetrievalPlan:
@@ -59,13 +58,13 @@ class TransparentRetrievalRouter:
                 query=query,
                 features=features,
                 routes=tuple(
-                    RouteDecision(route, False, executable, ("empty query",))
-                    for route, executable in (
-                        ("lexical", True),
-                        ("dense", True),
-                        ("temporal", False),
-                        ("graph", False),
-                        ("hierarchical", False),
+                    RouteDecision(route, False, True, ("empty query",))
+                    for route in (
+                        "lexical",
+                        "dense",
+                        "temporal",
+                        "graph",
+                        "hierarchical",
                     )
                 ),
             )
@@ -99,29 +98,27 @@ class TransparentRetrievalRouter:
         if features.comparison:
             dense_reasons.append("comparison query benefits from semantic matching")
         if features.temporal_signals:
-            dense_reasons.append("temporal signal keeps semantic coverage while temporal retrieval is advisory")
+            dense_reasons.append("temporal question keeps semantic coverage alongside version-aware retrieval")
         if not features.exact_lookup:
             dense_reasons.append("no exact-lookup signal; semantic retrieval retained")
 
-        # Default to hybrid when there is uncertainty. Exact, compact lookup
-        # queries may run lexical-only to avoid unnecessary dense work.
         lexical_requested = True
         dense_requested = semantic_need or not lexical_reasons
 
         temporal_reasons = (
             ("temporal/version signal detected",)
             if features.temporal_signals
-            else ()
+            else ("no temporal signal detected",)
         )
         graph_reasons = (
             ("relational or multi-hop signal detected",)
             if features.relational
-            else ()
+            else ("no relational signal detected",)
         )
         hierarchical_reasons = (
             ("broad summary/theme signal detected",)
             if features.broad_summary
-            else ()
+            else ("no broad summary signal detected",)
         )
 
         return RetrievalPlan(
@@ -143,20 +140,20 @@ class TransparentRetrievalRouter:
                 RouteDecision(
                     "temporal",
                     bool(features.temporal_signals),
-                    False,
-                    temporal_reasons or ("no temporal signal detected",),
+                    True,
+                    temporal_reasons,
                 ),
                 RouteDecision(
                     "graph",
                     features.relational,
-                    False,
-                    graph_reasons or ("no relational signal detected",),
+                    True,
+                    graph_reasons,
                 ),
                 RouteDecision(
                     "hierarchical",
                     features.broad_summary,
-                    False,
-                    hierarchical_reasons or ("no broad summary signal detected",),
+                    True,
+                    hierarchical_reasons,
                 ),
             ),
         )

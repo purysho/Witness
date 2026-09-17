@@ -1,10 +1,12 @@
-"""Adaptive retrieval orchestration with routing, fusion, and reranking traces."""
+"""Adaptive retrieval orchestration with routing, specialized routes, fusion, and reranking traces."""
 
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
 from .embeddings import EmbeddingProvider
+from .graph import GraphTraceItem, LocalEvidenceGraph
+from .hierarchical import HierarchyTraceItem, LocalHierarchyIndex
 from .hybrid import FusedCandidateTrace, reciprocal_rank_fusion
 from .index import LocalEvidenceIndex
 from .models import RetrievalCandidate
@@ -15,6 +17,7 @@ from .rerank import (
     rerank_candidates,
 )
 from .routing import RetrievalPlan, TransparentRetrievalRouter
+from .temporal import LocalTemporalIndex, TemporalSelection
 from .vector_index import LocalVectorIndex
 
 
@@ -24,6 +27,12 @@ class AdaptiveRetrievalTrace:
     plan: RetrievalPlan
     lexical_candidates: tuple[RetrievalCandidate, ...]
     dense_candidates: tuple[RetrievalCandidate, ...]
+    temporal_candidates: tuple[RetrievalCandidate, ...]
+    hierarchical_candidates: tuple[RetrievalCandidate, ...]
+    graph_candidates: tuple[RetrievalCandidate, ...]
+    temporal_selection: TemporalSelection | None
+    hierarchy_trace: tuple[HierarchyTraceItem, ...]
+    graph_trace: tuple[GraphTraceItem, ...]
     fusion_candidates: tuple[FusedCandidateTrace, ...]
     pre_rerank_candidates: tuple[RetrievalCandidate, ...]
     rerank_trace: tuple[RerankTraceItem, ...]
@@ -45,12 +54,7 @@ class AdaptiveRetrievalResult:
 
 
 class RoutedRetriever:
-    """Execute only the routes requested by the transparent query plan.
-
-    Temporal, graph, and hierarchical requests are currently advisory: their
-    need is made visible in Trace, but the engine does not pretend those routes
-    executed before their implementations exist.
-    """
+    """Execute the transparent plan and preserve route artifacts for Trace."""
 
     def __init__(
         self,
@@ -60,12 +64,18 @@ class RoutedRetriever:
         *,
         router: TransparentRetrievalRouter | None = None,
         reranker: RerankProvider | None = None,
+        temporal_index: LocalTemporalIndex | None = None,
+        hierarchy_index: LocalHierarchyIndex | None = None,
+        evidence_graph: LocalEvidenceGraph | None = None,
     ) -> None:
         self.lexical_index = lexical_index
         self.vector_index = vector_index
         self.embedding_provider = embedding_provider
         self.router = router or TransparentRetrievalRouter()
         self.reranker = reranker or DeterministicTokenReranker()
+        self.temporal_index = temporal_index or LocalTemporalIndex(lexical_index)
+        self.hierarchy_index = hierarchy_index or LocalHierarchyIndex(lexical_index)
+        self.evidence_graph = evidence_graph or LocalEvidenceGraph(lexical_index)
 
     def search(
         self,
@@ -84,6 +94,12 @@ class RoutedRetriever:
         plan = self.router.plan(query)
         lexical: tuple[RetrievalCandidate, ...] = ()
         dense: tuple[RetrievalCandidate, ...] = ()
+        temporal: tuple[RetrievalCandidate, ...] = ()
+        hierarchical: tuple[RetrievalCandidate, ...] = ()
+        graph: tuple[RetrievalCandidate, ...] = ()
+        temporal_selection: TemporalSelection | None = None
+        hierarchy_trace: tuple[HierarchyTraceItem, ...] = ()
+        graph_trace: tuple[GraphTraceItem, ...] = ()
 
         if plan.should_run("lexical"):
             lexical = tuple(self.lexical_index.search(query, limit=candidate_pool))
@@ -95,19 +111,43 @@ class RoutedRetriever:
                     limit=candidate_pool,
                 )
             )
+        if plan.should_run("temporal"):
+            temporal_result = self.temporal_index.search(query, limit=candidate_pool)
+            temporal = temporal_result.candidates
+            temporal_selection = temporal_result.selection
+        if plan.should_run("hierarchical"):
+            hierarchical_result = self.hierarchy_index.search(
+                query,
+                limit=candidate_pool,
+                seed_pool=candidate_pool,
+            )
+            hierarchical = hierarchical_result.candidates
+            hierarchy_trace = hierarchical_result.trace
+        if plan.should_run("graph"):
+            graph_result = self.evidence_graph.search(
+                query,
+                limit=candidate_pool,
+                claim_pool=candidate_pool,
+            )
+            graph = graph_result.candidates
+            graph_trace = graph_result.trace
+
+        active_routes = tuple(
+            route
+            for route in (lexical, dense, temporal, hierarchical, graph)
+            if route
+        )
 
         fusion_trace: tuple[FusedCandidateTrace, ...] = ()
-        if lexical and dense:
+        if len(active_routes) > 1:
             fused, fusion_trace = reciprocal_rank_fusion(
-                (lexical, dense),
+                active_routes,
                 limit=rerank_pool,
                 rrf_k=rrf_k,
             )
             pre_rerank = fused
-        elif lexical:
-            pre_rerank = lexical[:rerank_pool]
-        elif dense:
-            pre_rerank = dense[:rerank_pool]
+        elif active_routes:
+            pre_rerank = active_routes[0][:rerank_pool]
         else:
             pre_rerank = ()
 
@@ -125,6 +165,12 @@ class RoutedRetriever:
                 plan=plan,
                 lexical_candidates=lexical,
                 dense_candidates=dense,
+                temporal_candidates=temporal,
+                hierarchical_candidates=hierarchical,
+                graph_candidates=graph,
+                temporal_selection=temporal_selection,
+                hierarchy_trace=hierarchy_trace,
+                graph_trace=graph_trace,
                 fusion_candidates=fusion_trace,
                 pre_rerank_candidates=tuple(pre_rerank),
                 rerank_trace=reranked.trace,

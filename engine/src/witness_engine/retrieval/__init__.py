@@ -6,6 +6,12 @@ from .embeddings import (
     EmbeddingProvider,
     SentenceTransformerEmbeddingProvider,
 )
+from .graph import GraphRetrievalResult, GraphTraceItem, LocalEvidenceGraph
+from .hierarchical import (
+    HierarchicalRetrievalResult,
+    HierarchyTraceItem,
+    LocalHierarchyIndex,
+)
 from .hybrid import (
     HybridRetrievalResult,
     HybridRetriever,
@@ -25,6 +31,11 @@ from .rerank import (
     rerank_candidates,
 )
 from .routing import RetrievalPlan, RouteDecision, TransparentRetrievalRouter
+from .temporal import (
+    LocalTemporalIndex,
+    TemporalRetrievalResult,
+    TemporalSelection,
+)
 from .vector_index import LocalVectorIndex, VectorIndexError
 
 __all__ = [
@@ -35,10 +46,17 @@ __all__ = [
     "DeterministicTokenReranker",
     "EmbeddingProvider",
     "EvidenceIndexError",
+    "GraphRetrievalResult",
+    "GraphTraceItem",
+    "HierarchicalRetrievalResult",
+    "HierarchyTraceItem",
     "HybridRetrievalResult",
     "HybridRetriever",
     "LexicalRetriever",
+    "LocalEvidenceGraph",
     "LocalEvidenceIndex",
+    "LocalHierarchyIndex",
+    "LocalTemporalIndex",
     "LocalVectorIndex",
     "QueryFeatures",
     "RerankProvider",
@@ -50,9 +68,11 @@ __all__ = [
     "RouteDecision",
     "RoutedRetriever",
     "SentenceTransformerEmbeddingProvider",
+    "TemporalRetrievalResult",
+    "TemporalSelection",
     "TransparentRetrievalRouter",
     "VectorIndexError",
     "analyze_query",
-    "reciprocal_rank_fusion",
     "rerank_candidates",
+    "reciprocal_rank_fusion",
 ]

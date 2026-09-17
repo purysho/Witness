@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import sqlite3
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Sequence
 
 from ..chunking import Chunk
 from .models import RetrievalCandidate
@@ -44,6 +44,12 @@ class LocalEvidenceIndex:
                     start_offset INTEGER NOT NULL,
                     end_offset INTEGER NOT NULL
                 );
+
+                CREATE INDEX IF NOT EXISTS idx_indexed_chunks_source_version
+                    ON indexed_chunks(source_version_id);
+
+                CREATE INDEX IF NOT EXISTS idx_indexed_chunks_block
+                    ON indexed_chunks(block_id);
 
                 CREATE VIRTUAL TABLE IF NOT EXISTS indexed_chunks_fts USING fts5(
                     chunk_id UNINDEXED,
@@ -167,15 +173,42 @@ class LocalEvidenceIndex:
         escaped = [term.replace('"', '""') for term in terms]
         return " OR ".join(f'"{term}"' for term in escaped)
 
-    def search(self, query: str, limit: int = 10) -> list[RetrievalCandidate]:
+    @staticmethod
+    def _normalized_source_ids(
+        source_version_ids: Sequence[str] | None,
+    ) -> tuple[str, ...] | None:
+        if source_version_ids is None:
+            return None
+        return tuple(dict.fromkeys(str(value) for value in source_version_ids if value))
+
+    def search(
+        self,
+        query: str,
+        limit: int = 10,
+        *,
+        source_version_ids: Sequence[str] | None = None,
+    ) -> list[RetrievalCandidate]:
+        """Search evidence, optionally scoped to immutable source versions."""
         if limit <= 0:
             return []
         match = self._match_expression(query)
         if not match:
             return []
 
+        source_ids = self._normalized_source_ids(source_version_ids)
+        if source_ids == ():
+            return []
+
+        where = "indexed_chunks_fts MATCH ?"
+        params: list[object] = [match]
+        if source_ids is not None:
+            placeholders = ",".join("?" for _ in source_ids)
+            where += f" AND c.source_version_id IN ({placeholders})"
+            params.extend(source_ids)
+        params.append(limit)
+
         rows = self.connection.execute(
-            """
+            f"""
             SELECT
                 c.chunk_id,
                 c.source_version_id,
@@ -186,11 +219,11 @@ class LocalEvidenceIndex:
             FROM indexed_chunks_fts
             JOIN indexed_chunks AS c
               ON c.chunk_id = indexed_chunks_fts.chunk_id
-            WHERE indexed_chunks_fts MATCH ?
+            WHERE {where}
             ORDER BY bm25_score ASC, c.chunk_id ASC
             LIMIT ?
             """,
-            (match, limit),
+            tuple(params),
         ).fetchall()
 
         return [
@@ -200,6 +233,46 @@ class LocalEvidenceIndex:
                 score=float(-row["bm25_score"]),
                 rank=rank,
                 method="fts5-bm25",
+                source_version_id=row["source_version_id"],
+                locator=row["locator"],
+                block_id=row["block_id"],
+            )
+            for rank, row in enumerate(rows, start=1)
+        ]
+
+    def candidates_for_source_versions(
+        self,
+        source_version_ids: Sequence[str],
+        *,
+        limit: int = 10,
+        method: str = "source-scan",
+    ) -> list[RetrievalCandidate]:
+        """Return deterministic evidence rows for already-selected source versions.
+
+        Specialized routes use this as a fallback when temporal or graph selection
+        is meaningful but the remaining lexical query has no searchable terms.
+        """
+        source_ids = self._normalized_source_ids(source_version_ids)
+        if limit <= 0 or not source_ids:
+            return []
+        placeholders = ",".join("?" for _ in source_ids)
+        rows = self.connection.execute(
+            f"""
+            SELECT chunk_id, source_version_id, block_id, locator, text
+            FROM indexed_chunks
+            WHERE source_version_id IN ({placeholders})
+            ORDER BY source_version_id, block_id, start_offset, chunk_id
+            LIMIT ?
+            """,
+            (*source_ids, limit),
+        ).fetchall()
+        return [
+            RetrievalCandidate(
+                chunk_id=row["chunk_id"],
+                text=row["text"],
+                score=0.0,
+                rank=rank,
+                method=method,
                 source_version_id=row["source_version_id"],
                 locator=row["locator"],
                 block_id=row["block_id"],

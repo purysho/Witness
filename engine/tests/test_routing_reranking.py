@@ -54,16 +54,18 @@ def test_router_uses_lexical_only_for_compact_exact_lookup():
     assert any("quoted phrase" in reason for reason in plan.decision("lexical").reasons)
 
 
-def test_router_marks_future_specialized_routes_without_faking_execution():
+def test_router_executes_specialized_routes_when_signals_are_present():
     plan = TransparentRetrievalRouter().plan(
         "Summarize how deployment dependencies changed after 2025 across all documents"
     )
 
     assert plan.should_run("lexical") is True
     assert plan.should_run("dense") is True
-    assert set(plan.advisory_routes) == {"temporal", "graph", "hierarchical"}
-    assert plan.decision("temporal").requested is True
-    assert plan.decision("temporal").executable is False
+    assert plan.should_run("temporal") is True
+    assert plan.should_run("graph") is True
+    assert plan.should_run("hierarchical") is True
+    assert plan.advisory_routes == ()
+    assert plan.decision("temporal").executable is True
 
 
 def test_deterministic_reranker_records_pre_and_post_ranks():
@@ -132,7 +134,11 @@ def test_routed_retriever_executes_plan_and_serializes_trace(tmp_path):
 
     assert semantic.trace.plan.should_run("lexical") is True
     assert semantic.trace.plan.should_run("dense") is True
-    assert "graph" in semantic.trace.advisory_routes
+    assert semantic.trace.plan.should_run("graph") is True
+    assert semantic.trace.advisory_routes == ()
+    # Direct chunk insertion does not create graph projections; the route still
+    # executes truthfully and reports an empty graph result rather than faking one.
+    assert semantic.trace.graph_candidates == ()
     assert semantic.trace.rerank_trace
     assert semantic.candidates[0].rank == 1
 
