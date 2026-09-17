@@ -8,8 +8,11 @@ from pathlib import Path
 from .chunking import chunk_block
 from .ids import file_sha256, stable_id
 from .ingestion.registry import extract_document
+from .retrieval.embeddings import EmbeddingProvider
+from .retrieval.hybrid import HybridRetrievalResult, HybridRetriever
 from .retrieval.index import LocalEvidenceIndex
 from .retrieval.models import RetrievalCandidate
+from .retrieval.vector_index import LocalVectorIndex
 
 
 @dataclass(frozen=True)
@@ -21,6 +24,7 @@ class IndexingResult:
     chunk_count: int
     media_type: str
     warnings: tuple[str, ...] = ()
+    embedded_chunk_count: int = 0
 
 
 def index_document(
@@ -28,13 +32,18 @@ def index_document(
     index: LocalEvidenceIndex,
     *,
     max_chars: int = 1200,
+    vector_index: LocalVectorIndex | None = None,
+    embedding_provider: EmbeddingProvider | None = None,
 ) -> IndexingResult:
     """Extract, chunk, and index any supported local document.
 
-    The source-version identity changes only when either the normalized source
-    path or file bytes change. Re-indexing identical input is idempotent at the
-    evidence identity layer.
+    Dense indexing is optional. When enabled, both the vector index and
+    embedding provider must be supplied so the embedding identity is explicit.
     """
+    if (vector_index is None) != (embedding_provider is None):
+        raise ValueError(
+            "vector_index and embedding_provider must be supplied together"
+        )
 
     source_path = Path(path).expanduser().resolve()
     if not source_path.is_file():
@@ -57,6 +66,13 @@ def index_document(
 
     index.index_chunks(rows)
 
+    embedded_chunk_count = 0
+    if vector_index is not None and embedding_provider is not None:
+        embedded_chunk_count = vector_index.sync(
+            embedding_provider,
+            source_version_id=source_version_id,
+        )
+
     return IndexingResult(
         path=str(source_path),
         source_version_id=source_version_id,
@@ -65,6 +81,7 @@ def index_document(
         chunk_count=chunk_count,
         media_type=document.media_type,
         warnings=document.warnings,
+        embedded_chunk_count=embedded_chunk_count,
     )
 
 
@@ -73,10 +90,18 @@ def index_text_document(
     index: LocalEvidenceIndex,
     *,
     max_chars: int = 1200,
+    vector_index: LocalVectorIndex | None = None,
+    embedding_provider: EmbeddingProvider | None = None,
 ) -> IndexingResult:
     """Backward-compatible name for the original Phase 2 text pipeline."""
 
-    return index_document(path, index, max_chars=max_chars)
+    return index_document(
+        path,
+        index,
+        max_chars=max_chars,
+        vector_index=vector_index,
+        embedding_provider=embedding_provider,
+    )
 
 
 def search_evidence(
@@ -85,6 +110,30 @@ def search_evidence(
     *,
     limit: int = 10,
 ) -> list[RetrievalCandidate]:
-    """Search indexed local evidence without performing answer generation."""
+    """Search indexed local evidence with the lexical baseline."""
 
     return index.search(query, limit=limit)
+
+
+def search_hybrid_evidence(
+    query: str,
+    lexical_index: LocalEvidenceIndex,
+    vector_index: LocalVectorIndex,
+    embedding_provider: EmbeddingProvider,
+    *,
+    limit: int = 10,
+    candidate_pool: int = 30,
+    rrf_k: int = 60,
+) -> HybridRetrievalResult:
+    """Search BM25 and dense routes and return candidates plus a full trace."""
+
+    return HybridRetriever(
+        lexical_index,
+        vector_index,
+        embedding_provider,
+    ).search(
+        query,
+        limit=limit,
+        candidate_pool=candidate_pool,
+        rrf_k=rrf_k,
+    )
