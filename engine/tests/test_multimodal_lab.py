@@ -171,10 +171,14 @@ def test_routed_lab_cites_visual_region_alongside_text_evidence(tmp_path):
                 SELECT chunk_id
                 FROM indexed_chunks
                 WHERE source_version_id = ?
+                  AND text LIKE ?
                 ORDER BY start_offset, chunk_id
                 LIMIT 1
                 """,
-                (indexed.source_version_id,),
+                (
+                    indexed.source_version_id,
+                    "%margins remained stable%",
+                ),
             ).fetchone()
             assert text_row is not None
 
