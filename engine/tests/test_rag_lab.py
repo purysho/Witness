@@ -116,6 +116,7 @@ def test_lab_runner_persists_metrics_and_case_trace_links(tmp_path):
 
         by_id = {case.case_id: case for case in result.cases}
         assert by_id["api-port"].metrics.recall_at_k == 1.0
+        assert by_id["api-port"].metrics.precision_at_k == 0.2
         assert by_id["api-port"].query_run_id
         assert by_id["api-port"].ask_result is not None
         assert by_id["missing-encryption"].answer_state == SufficiencyState.INSUFFICIENT
