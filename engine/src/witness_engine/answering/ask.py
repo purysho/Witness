@@ -83,8 +83,77 @@ class AskEngine:
         )
         self.run_store.append(
             run_id,
-            "retrieval.completed",
-            retrieval.trace.to_dict(),
+            "query.normalized",
+            asdict(retrieval.trace.plan.features),
+        )
+        self.run_store.append(
+            run_id,
+            "route.decided",
+            retrieval.trace.plan.to_dict(),
+        )
+        self.run_store.append(
+            run_id,
+            "retrieval.lexical.completed",
+            {"candidates": [asdict(item) for item in retrieval.trace.lexical_candidates]},
+        )
+        self.run_store.append(
+            run_id,
+            "retrieval.dense.completed",
+            {"candidates": [asdict(item) for item in retrieval.trace.dense_candidates]},
+        )
+        self.run_store.append(
+            run_id,
+            "retrieval.temporal.completed",
+            {
+                "selection": (
+                    asdict(retrieval.trace.temporal_selection)
+                    if retrieval.trace.temporal_selection is not None
+                    else None
+                ),
+                "candidates": [
+                    asdict(item) for item in retrieval.trace.temporal_candidates
+                ],
+            },
+        )
+        self.run_store.append(
+            run_id,
+            "retrieval.hierarchical.completed",
+            {
+                "candidates": [
+                    asdict(item) for item in retrieval.trace.hierarchical_candidates
+                ],
+                "expansions": [
+                    asdict(item) for item in retrieval.trace.hierarchy_trace
+                ],
+            },
+        )
+        self.run_store.append(
+            run_id,
+            "retrieval.graph.completed",
+            {
+                "candidates": [
+                    asdict(item) for item in retrieval.trace.graph_candidates
+                ],
+                "paths": [asdict(item) for item in retrieval.trace.graph_trace],
+            },
+        )
+        self.run_store.append(
+            run_id,
+            "fusion.completed",
+            {
+                "candidates": [
+                    asdict(item) for item in retrieval.trace.fusion_candidates
+                ],
+                "rrf_k": retrieval.trace.rrf_k,
+            },
+        )
+        self.run_store.append(
+            run_id,
+            "rerank.completed",
+            {
+                "provider_id": retrieval.trace.reranker_provider_id,
+                "items": [asdict(item) for item in retrieval.trace.rerank_trace],
+            },
         )
 
         reconciliation = self.reconciler.reconcile(retrieval.candidates)
