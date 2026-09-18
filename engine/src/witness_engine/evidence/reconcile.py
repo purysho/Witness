@@ -105,19 +105,29 @@ def _stem(token: str) -> str:
     return value
 
 
+def _clean_token(token: str) -> str:
+    return token.strip(".,;:!?()[]{}")
+
+
 def _tokens(text: str) -> set[str]:
-    return {_stem(token) for token in _TOKEN_RE.findall(text)}
+    return {
+        _stem(_clean_token(token))
+        for token in _TOKEN_RE.findall(text)
+        if _clean_token(token)
+    }
 
 
 def _topic_tokens(text: str) -> set[str]:
     values = set()
     for token in _TOKEN_RE.findall(text):
-        stem = _stem(token)
+        cleaned = _clean_token(token)
+        if not cleaned or _NUMBER_RE.fullmatch(cleaned):
+            continue
+        stem = _stem(cleaned)
         if (
             stem in _STOPWORDS
             or stem in _NEGATIONS
             or stem in _POLARITY_TERMS
-            or _NUMBER_RE.fullmatch(token)
         ):
             continue
         values.add(stem)
