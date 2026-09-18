@@ -23,7 +23,7 @@ Current capabilities:
 - persisted RAG Lab datasets and runs with content-addressed dataset/corpus/configuration snapshots;
 - lexical-only, dense-only, hybrid, and routed benchmark execution over the production Ask pipeline;
 - objective retrieval, citation, abstention, contradiction, latency, and cost-availability metrics plus A/B comparison and JSON/CSV export;
-- isolated Attack Lab snapshots, content-addressed attack manifests, clean-vs-attacked execution, poisoning-aware source independence, deterministic invariants, persisted attack traces, and JSON/CSV export.
+- isolated Attack Lab snapshots, content-addressed attack manifests, clean-vs-attacked execution, poisoning-aware source independence, deterministic invariants, persisted attack traces, and JSON/CSV export;\n- immutable visual evidence records with normalized page-region locators, content-addressed visual assets, and deterministic/provider-neutral cross-modal vector indexing.
 
 ## Specialized retrieval
 
@@ -138,3 +138,10 @@ Attack Lab is an orchestration layer around the production evaluation and Ask pi
 Attack evidence uses deterministic synthetic identity keys so repeated executions of the same manifest against the same canonical corpus reproduce the same attacked corpus fingerprint despite per-run physical snapshot paths. Exact-content duplicate sources are collapsed for independent-source counting to make duplicate-poisoning amplification visible rather than treating copies as corroboration.
 
 See `docs/attack-lab.md`.
+
+
+## Multimodal evidence
+
+Phase 7 starts from provenance rather than OCR. Visual evidence is anchored to an immutable source version plus a normalized page-region locator, while exact visual payloads are deduplicated by SHA-256. The visual embedding contract provides paired image/text embedding methods so later CLIP/SigLIP-style providers can be swapped without changing evidence identity.
+
+The deterministic visual hash provider and exact `LocalVisualVectorIndex` are network-free test baselines, not semantic vision models. See `docs/multimodal.md`.
