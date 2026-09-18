@@ -168,6 +168,26 @@ export function App() {
     }
   }
 
+  async function compareLabRuns(runA: string, runB: string) {
+    setBusy(true);
+    setError(null);
+    setLabExportPath(null);
+    try {
+      const comparison = await engine.labCompare(runA, runB);
+      setLabComparison(comparison);
+      setStatus(
+        "Loaded persisted Lab comparison · " +
+          comparison.run_a.config.name +
+          " vs " +
+          comparison.run_b.config.name,
+      );
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function inspectLabCase(runId: string, caseId: string) {
     setBusy(true);
     setError(null);
@@ -332,6 +352,7 @@ export function App() {
               onLoadDataset={loadLabDataset}
               onRunAB={runLabAB}
               onInspectCase={inspectLabCase}
+              onCompareRuns={compareLabRuns}
               onExport={exportLab}
             />
           )}
