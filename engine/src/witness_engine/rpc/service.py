@@ -9,7 +9,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from ..attack import AttackManifest, AttackRunner, AttackStore
+from ..attack import AttackManifest, AttackRunner, AttackStore, export_attack_run
 from ..answering import LocalRunStore
 from ..evaluation import (
     EvalConfig,
@@ -52,6 +52,7 @@ ALLOWED_METHODS = frozenset(
         "attack.run",
         "attack.runs",
         "attack.run.get",
+        "attack.export",
     }
 )
 
@@ -596,5 +597,37 @@ class RpcService:
                     str(exc),
                 ) from exc
             return result.model_dump(mode="json")
+        if method == "attack.export":
+            assert self.workspace_path is not None
+            run_id = str(params.get("attack_run_id", "")).strip()
+            format_value = str(params.get("format", "json")).strip().casefold()
+            if not run_id:
+                raise RpcServiceError(
+                    "invalid_params",
+                    "attack.export requires attack_run_id",
+                )
+            requested = str(params.get("path", "")).strip()
+            output = (
+                Path(requested).expanduser().resolve()
+                if requested
+                else (
+                    self.workspace_path
+                    / "exports"
+                    / f"attack-{run_id[:12]}.{format_value}"
+                )
+            )
+            try:
+                path = export_attack_run(
+                    self._attack_store(),
+                    run_id,
+                    output,
+                    format=format_value,
+                )
+            except (KeyError, ValueError) as exc:
+                raise RpcServiceError(
+                    "attack_export_failed",
+                    str(exc),
+                ) from exc
+            return {"path": str(path), "format": format_value}
 
         raise AssertionError(method)

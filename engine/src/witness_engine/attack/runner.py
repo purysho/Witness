@@ -34,6 +34,41 @@ def _answer_text(case) -> str:
     )
 
 
+def _independent_source_count(case) -> int | None:
+    payload = case.ask_result or {}
+    sufficiency = payload.get("sufficiency", {}) if isinstance(payload, dict) else {}
+    value = (
+        sufficiency.get("independent_source_count")
+        if isinstance(sufficiency, dict)
+        else None
+    )
+    return int(value) if isinstance(value, int) else None
+
+
+def _citations_resolve_to_context(case) -> bool | None:
+    payload = case.ask_result or {}
+    if not isinstance(payload, dict):
+        return None
+    context = payload.get("context", {})
+    answer = payload.get("answer", {})
+    if not isinstance(context, dict) or not isinstance(answer, dict):
+        return None
+    evidence = context.get("evidence", [])
+    citations = answer.get("citations", [])
+    if not isinstance(evidence, list) or not isinstance(citations, list):
+        return None
+    evidence_ids = {
+        item.get("evidence_id")
+        for item in evidence
+        if isinstance(item, dict) and item.get("evidence_id")
+    }
+    return all(
+        isinstance(item, dict)
+        and item.get("evidence_id") in evidence_ids
+        for item in citations
+    )
+
+
 def _case_map(result):
     return {case.case_id: case for case in result.cases}
 
@@ -153,6 +188,39 @@ class AttackRunner:
             passed = attacked_recall >= clean_recall
             detail = (
                 f"Recall@K clean={clean_recall:.4f}, attacked={attacked_recall:.4f}."
+            )
+        elif invariant.kind == "max_independent_source_delta":
+            clean_count = _independent_source_count(clean)
+            attacked_count = _independent_source_count(attacked)
+            if clean_count is None or attacked_count is None:
+                return AttackInvariantResult(
+                    invariant_id=invariant.invariant_id,
+                    kind=invariant.kind,
+                    status=AttackInvariantStatus.NOT_APPLICABLE,
+                    case_id=invariant.case_id,
+                    detail="Independent source counts are unavailable for this case.",
+                )
+            actual_delta = attacked_count - clean_count
+            passed = actual_delta <= int(invariant.max_delta or 0)
+            detail = (
+                f"Independent sources clean={clean_count}, attacked={attacked_count}, "
+                f"delta={actual_delta}, allowed<={invariant.max_delta}."
+            )
+        elif invariant.kind == "citations_resolve_to_context":
+            resolved = _citations_resolve_to_context(attacked)
+            if resolved is None:
+                return AttackInvariantResult(
+                    invariant_id=invariant.invariant_id,
+                    kind=invariant.kind,
+                    status=AttackInvariantStatus.NOT_APPLICABLE,
+                    case_id=invariant.case_id,
+                    detail="Citation/context artifacts are unavailable for this case.",
+                )
+            passed = resolved
+            detail = (
+                "Every attacked citation resolves to evidence in its context pack."
+                if passed
+                else "At least one attacked citation does not resolve to its context pack."
             )
         else:
             return AttackInvariantResult(

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from hashlib import sha256
 from dataclasses import asdict, dataclass
 from enum import Enum
 from itertools import combinations
@@ -241,6 +242,75 @@ class EvidenceReconciler:
                 )
         return tuple(values)
 
+    def _source_content_fingerprint(
+        self,
+        source_version_id: str,
+    ) -> str | None:
+        rows = self.connection.execute(
+            """
+            SELECT block_id, start_offset, chunk_id, text
+            FROM indexed_chunks
+            WHERE source_version_id = ?
+            ORDER BY block_id, start_offset, chunk_id
+            """,
+            (source_version_id,),
+        ).fetchall()
+        if not rows:
+            return None
+        digest = sha256()
+        for row in rows:
+            digest.update(str(row["text"]).encode("utf-8"))
+            digest.update(b"\x1e")
+        return digest.hexdigest()
+
+    @staticmethod
+    def _independent_source_count(
+        observations: tuple[ClaimObservation, ...],
+        content_fingerprints: dict[str, str | None],
+    ) -> int:
+        source_ids = {
+            item.source_version_id
+            for item in observations
+            if item.source_version_id
+        }
+        if not source_ids:
+            return 0
+
+        parent = {source_id: source_id for source_id in source_ids}
+
+        def find(value: str) -> str:
+            while parent[value] != value:
+                parent[value] = parent[parent[value]]
+                value = parent[value]
+            return value
+
+        def union(left: str, right: str) -> None:
+            left_root = find(left)
+            right_root = find(right)
+            if left_root != right_root:
+                parent[right_root] = left_root
+
+        by_logical: dict[str, str] = {}
+        by_content: dict[str, str] = {}
+        for item in observations:
+            source_id = item.source_version_id
+            if not source_id:
+                continue
+            existing = by_logical.get(item.logical_source_id)
+            if item.logical_source_id and existing:
+                union(source_id, existing)
+            elif item.logical_source_id:
+                by_logical[item.logical_source_id] = source_id
+
+            fingerprint = content_fingerprints.get(source_id)
+            existing_content = by_content.get(fingerprint or "")
+            if fingerprint and existing_content:
+                union(source_id, existing_content)
+            elif fingerprint:
+                by_content[fingerprint] = source_id
+
+        return len({find(source_id) for source_id in source_ids})
+
     def _supersession_order(
         self,
         left: ClaimObservation,
@@ -284,16 +354,35 @@ class EvidenceReconciler:
     ) -> ReconciliationResult:
         observations = self._observations(candidates)
         relations: list[EvidenceRelationRecord] = []
+        source_fingerprints = {
+            item.source_version_id: self._source_content_fingerprint(
+                item.source_version_id
+            )
+            for item in observations
+            if item.source_version_id
+        }
 
         for left, right in combinations(observations, 2):
             if left.normalized_text == right.normalized_text:
-                if left.logical_source_id == right.logical_source_id:
+                same_content = (
+                    source_fingerprints.get(left.source_version_id) is not None
+                    and source_fingerprints.get(left.source_version_id)
+                    == source_fingerprints.get(right.source_version_id)
+                )
+                if (
+                    left.logical_source_id == right.logical_source_id
+                    or same_content
+                ):
                     relations.append(
                         self._record(
                             EvidenceRelation.DUPLICATE,
                             left,
                             right,
-                            "same normalized claim from the same logical source",
+                            (
+                                "same normalized claim from the same logical source"
+                                if left.logical_source_id == right.logical_source_id
+                                else "same normalized claim from content-identical sources"
+                            ),
                         )
                     )
                 else:
@@ -372,7 +461,8 @@ class EvidenceReconciler:
             supersessions=supersessions,
             duplicates=duplicates,
             corroborations=corroborations,
-            independent_source_count=len(
-                {item.logical_source_id for item in observations if item.logical_source_id}
+            independent_source_count=self._independent_source_count(
+                observations,
+                source_fingerprints,
             ),
         )

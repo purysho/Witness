@@ -103,4 +103,14 @@ export const engine = {
     call<AttackRunResult>("attack.run.get", {
       attack_run_id: attackRunId,
     }),
+  attackExport: (
+    attackRunId: string,
+    format: "json" | "csv",
+    path?: string,
+  ) =>
+    call<{ path: string; format: string }>("attack.export", {
+      attack_run_id: attackRunId,
+      format,
+      ...(path ? { path } : {}),
+    }),
 };

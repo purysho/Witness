@@ -13,7 +13,7 @@ from .models import (
 )
 from .runner import AttackRunner
 from .snapshot import AttackSnapshot, create_attack_snapshot
-from .store import AttackStore
+from .store import AttackStore, export_attack_run
 
 __all__ = [
     "AttackCaseComparison",
@@ -29,4 +29,5 @@ __all__ = [
     "AttackSnapshot",
     "AttackStore",
     "create_attack_snapshot",
+    "export_attack_run",
 ]

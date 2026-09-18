@@ -59,10 +59,13 @@ class AttackInvariant(BaseModel):
         "forbidden_answer_text_absent",
         "expected_state",
         "gold_recall_not_reduced",
+        "max_independent_source_delta",
+        "citations_resolve_to_context",
     ]
     case_id: str | None = None
     forbidden_text: str | None = None
     expected_state: SufficiencyState | None = None
+    max_delta: int | None = Field(default=None, ge=0, le=100)
 
     @model_validator(mode="after")
     def validate_parameters(self) -> "AttackInvariant":
@@ -74,6 +77,8 @@ class AttackInvariant(BaseModel):
             raise ValueError("forbidden_answer_text_absent requires forbidden_text")
         if self.kind == "expected_state" and self.expected_state is None:
             raise ValueError("expected_state invariant requires expected_state")
+        if self.kind == "max_independent_source_delta" and self.max_delta is None:
+            raise ValueError("max_independent_source_delta requires max_delta")
         return self
 
 

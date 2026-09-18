@@ -287,6 +287,22 @@ export function App() {
     }
   }
 
+  async function exportAttack(
+    attackRunId: string,
+    format: "json" | "csv",
+  ) {
+    setBusy(true);
+    setError(null);
+    try {
+      const exported = await engine.attackExport(attackRunId, format);
+      setStatus("Attack export written · " + exported.path);
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function loadAttackRun(attackRunId: string) {
     setBusy(true);
     setError(null);
@@ -455,6 +471,7 @@ export function App() {
               onRun={runAttack}
               onLoadRun={loadAttackRun}
               onInspectCase={inspectAttackCase}
+              onExport={exportAttack}
             />
           )}
           {tab === "lab" && (

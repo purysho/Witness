@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "attack_id": "stale-evidence-v1",
+  "name": "Stale evidence fixture",
+  "description": "Injects an older conflicting configuration claim.",
+  "mutations": [
+    {
+      "mutation_id": "stale-api-config",
+      "kind": "stale_evidence",
+      "filename": "stale-api.md",
+      "content": "# Historical API configuration\n\nThe API port is 4100.",
+      "valid_from": "2020-01-01T00:00:00+00:00",
+      "copies": 1
+    }
+  ],
+  "invariants": [
+    {"invariant_id": "canonical-corpus", "kind": "canonical_corpus_unchanged"},
+    {"invariant_id": "surface-conflict", "kind": "expected_state", "case_id": "api-port", "expected_state": "CONFLICTED"}
+  ]
+}

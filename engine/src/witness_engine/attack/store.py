@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import csv
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 from ..retrieval.index import LocalEvidenceIndex
 from .models import AttackManifest, AttackRunResult
@@ -142,7 +145,15 @@ class AttackStore:
             )
         return started_at
 
-    def complete_run(self, result: AttackRunResult) -> None:
+    def complete_run(self, result: AttackRunResult) -> AttackRunResult:
+        completed_at = _now()
+        completed = result.model_copy(
+            update={
+                "run": result.run.model_copy(
+                    update={"completed_at": completed_at}
+                )
+            }
+        )
         with self.connection:
             self.connection.execute(
                 """
@@ -151,11 +162,12 @@ class AttackStore:
                 WHERE attack_run_id = ?
                 """,
                 (
-                    _now(),
-                    result.model_dump_json(),
-                    result.run.attack_run_id,
+                    completed_at,
+                    completed.model_dump_json(),
+                    completed.run.attack_run_id,
                 ),
             )
+        return completed
 
     def fail_run(self, attack_run_id: str) -> None:
         with self.connection:
@@ -190,3 +202,97 @@ class AttackStore:
             (max(1, min(limit, 500)),),
         ).fetchall()
         return tuple(dict(row) for row in rows)
+
+
+def export_attack_run(
+    store: AttackStore,
+    attack_run_id: str,
+    path: str | Path,
+    *,
+    format: str = "json",
+) -> Path:
+    """Export a complete reproducible Attack Lab result."""
+
+    result = store.load_run(attack_run_id)
+    output = Path(path).expanduser().resolve()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    normalized = format.casefold()
+
+    if normalized == "json":
+        output.write_text(
+            json.dumps(
+                result.model_dump(mode="json"),
+                indent=2,
+                sort_keys=True,
+                ensure_ascii=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        return output
+
+    if normalized != "csv":
+        raise ValueError("Attack export format must be json or csv")
+
+    fieldnames = [
+        "record_type",
+        "attack_run_id",
+        "attack_id",
+        "case_id",
+        "invariant_id",
+        "invariant_kind",
+        "invariant_status",
+        "clean_state",
+        "attacked_state",
+        "clean_passed",
+        "attacked_passed",
+        "recall_delta",
+        "precision_delta",
+        "citation_coverage_delta",
+        "detail",
+        "canonical_corpus_fingerprint",
+        "attacked_corpus_fingerprint",
+        "snapshot_id",
+    ]
+    with output.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        base = {
+            "attack_run_id": result.run.attack_run_id,
+            "attack_id": result.run.attack_id,
+            "canonical_corpus_fingerprint": result.run.canonical_corpus_fingerprint,
+            "attacked_corpus_fingerprint": result.run.attacked_corpus_fingerprint,
+            "snapshot_id": result.run.snapshot_id,
+        }
+        for case in result.cases:
+            writer.writerow(
+                {
+                    **base,
+                    "record_type": "case",
+                    "case_id": case.case_id,
+                    "clean_state": (
+                        case.clean_state.value if case.clean_state else ""
+                    ),
+                    "attacked_state": (
+                        case.attacked_state.value if case.attacked_state else ""
+                    ),
+                    "clean_passed": case.clean_passed,
+                    "attacked_passed": case.attacked_passed,
+                    "recall_delta": case.recall_delta,
+                    "precision_delta": case.precision_delta,
+                    "citation_coverage_delta": case.citation_coverage_delta,
+                }
+            )
+        for invariant in result.invariants:
+            writer.writerow(
+                {
+                    **base,
+                    "record_type": "invariant",
+                    "case_id": invariant.case_id or "",
+                    "invariant_id": invariant.invariant_id,
+                    "invariant_kind": invariant.kind,
+                    "invariant_status": invariant.status.value,
+                    "detail": invariant.detail,
+                }
+            )
+    return output

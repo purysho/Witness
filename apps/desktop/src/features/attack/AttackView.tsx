@@ -25,6 +25,7 @@ interface Props {
   ) => void;
   onLoadRun: (attackRunId: string) => void;
   onInspectCase: (side: "clean" | "attacked", caseId: string) => void;
+  onExport: (attackRunId: string, format: "json" | "csv") => void;
 }
 
 function delta(value: number | null) {
@@ -43,6 +44,7 @@ export function AttackView({
   onRun,
   onLoadRun,
   onInspectCase,
+  onExport,
 }: Props) {
   const [manifestPath, setManifestPath] = useState("");
   const [manifestFingerprint, setManifestFingerprint] = useState("");
@@ -181,6 +183,22 @@ export function AttackView({
               <div>
                 <span className="eyebrow">ISOLATION</span>
                 <h3>{result.run.attack_name}</h3>
+              </div>
+              <div className="lab-run-actions">
+                <button
+                  className="secondary"
+                  disabled={busy}
+                  onClick={() => onExport(result.run.attack_run_id, "json")}
+                >
+                  Export JSON
+                </button>
+                <button
+                  className="secondary"
+                  disabled={busy}
+                  onClick={() => onExport(result.run.attack_run_id, "csv")}
+                >
+                  Export CSV
+                </button>
               </div>
             </div>
             <div className="model-judged-note">

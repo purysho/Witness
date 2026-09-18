@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "attack_id": "conflicting-source-v1",
+  "name": "Conflicting source fixture",
+  "description": "Adds a materially incompatible claim from a separate source.",
+  "mutations": [
+    {
+      "mutation_id": "api-conflict",
+      "kind": "conflicting_source",
+      "filename": "conflicting-api.md",
+      "content": "# Alternative API configuration\n\nThe API port is 9999.",
+      "valid_from": "2026-09-18T00:00:00+00:00",
+      "copies": 1
+    }
+  ],
+  "invariants": [
+    {"invariant_id": "canonical-corpus", "kind": "canonical_corpus_unchanged"},
+    {"invariant_id": "conflict-visible", "kind": "expected_state", "case_id": "api-port", "expected_state": "CONFLICTED"}
+  ]
+}
