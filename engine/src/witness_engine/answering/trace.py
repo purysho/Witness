@@ -6,7 +6,10 @@ import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 
+from ..ids import stable_id
 from ..retrieval.index import LocalEvidenceIndex
+
+TRACE_SCHEMA_VERSION = 1
 
 
 def _now() -> str:
@@ -15,8 +18,10 @@ def _now() -> str:
 
 @dataclass(frozen=True)
 class TraceEvent:
+    event_id: str
     run_id: str
     sequence: int
+    schema_version: int
     stage: str
     payload: dict
     created_at: str
@@ -46,6 +51,8 @@ class LocalRunStore:
             CREATE TABLE IF NOT EXISTS query_trace_events (
                 run_id TEXT NOT NULL,
                 sequence INTEGER NOT NULL,
+                event_id TEXT,
+                schema_version INTEGER NOT NULL DEFAULT 1,
                 stage TEXT NOT NULL,
                 payload_json TEXT NOT NULL,
                 created_at TEXT NOT NULL,
@@ -57,6 +64,24 @@ class LocalRunStore:
                 ON query_trace_events(run_id, stage);
             """
         )
+        self._migrate_trace_columns()
+
+    def _migrate_trace_columns(self) -> None:
+        columns = {
+            row["name"]
+            for row in self.connection.execute(
+                "PRAGMA table_info(query_trace_events)"
+            ).fetchall()
+        }
+        with self.connection:
+            if "event_id" not in columns:
+                self.connection.execute(
+                    "ALTER TABLE query_trace_events ADD COLUMN event_id TEXT"
+                )
+            if "schema_version" not in columns:
+                self.connection.execute(
+                    "ALTER TABLE query_trace_events ADD COLUMN schema_version INTEGER NOT NULL DEFAULT 1"
+                )
 
     def start_run(self, run_id: str, question: str) -> None:
         with self.connection:
@@ -78,20 +103,32 @@ class LocalRunStore:
             (run_id,),
         ).fetchone()
         sequence = int(row["next_sequence"])
+        event_id = stable_id("trace-event", run_id, str(sequence), stage)
         created_at = _now()
         payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         with self.connection:
             self.connection.execute(
                 """
                 INSERT INTO query_trace_events (
-                    run_id, sequence, stage, payload_json, created_at
-                ) VALUES (?, ?, ?, ?, ?)
+                    run_id, sequence, event_id, schema_version,
+                    stage, payload_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (run_id, sequence, stage, payload_json, created_at),
+                (
+                    run_id,
+                    sequence,
+                    event_id,
+                    TRACE_SCHEMA_VERSION,
+                    stage,
+                    payload_json,
+                    created_at,
+                ),
             )
         return TraceEvent(
+            event_id=event_id,
             run_id=run_id,
             sequence=sequence,
+            schema_version=TRACE_SCHEMA_VERSION,
             stage=stage,
             payload=payload,
             created_at=created_at,
@@ -119,7 +156,9 @@ class LocalRunStore:
     def load_events(self, run_id: str) -> tuple[TraceEvent, ...]:
         rows = self.connection.execute(
             """
-            SELECT run_id, sequence, stage, payload_json, created_at
+            SELECT
+                run_id, sequence, event_id, schema_version,
+                stage, payload_json, created_at
             FROM query_trace_events
             WHERE run_id = ?
             ORDER BY sequence
@@ -128,8 +167,16 @@ class LocalRunStore:
         ).fetchall()
         return tuple(
             TraceEvent(
+                event_id=row["event_id"]
+                or stable_id(
+                    "trace-event",
+                    row["run_id"],
+                    str(row["sequence"]),
+                    row["stage"],
+                ),
                 run_id=row["run_id"],
                 sequence=int(row["sequence"]),
+                schema_version=int(row["schema_version"]),
                 stage=row["stage"],
                 payload=json.loads(row["payload_json"]),
                 created_at=row["created_at"],
