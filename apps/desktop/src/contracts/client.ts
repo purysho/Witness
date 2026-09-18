@@ -5,6 +5,7 @@ import {
   type AttackManifestSummary,
   type AttackRunListItem,
   type AttackRunResult,
+  type DemoLoadResult,
   type EvalConfigInput,
   type EvalDatasetSummary,
   type EvalRunSummary,
@@ -52,6 +53,8 @@ export const engine = {
     call<WorkspaceRepairResult>("workspace.repair"),
   providerSettings: () =>
     call<ProviderSnapshot>("providers.get"),
+  loadDemo: () =>
+    call<DemoLoadResult>("demo.load"),
   setProviderSettings: (
     embeddingDimensions: number,
     visualMode: "off" | "hash",

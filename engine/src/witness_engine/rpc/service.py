@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from ..attack import AttackManifest, AttackRunner, AttackStore, export_attack_run
 from ..answering import LocalRunStore
+from ..demo import install_demo_pack
 from ..evaluation import (
     EvalConfig,
     EvalRunner,
@@ -63,6 +64,7 @@ ALLOWED_METHODS = frozenset(
         "workspace.repair",
         "providers.get",
         "providers.set",
+        "demo.load",
         "source.import",
         "source.list",
         "query.run",
@@ -356,6 +358,19 @@ class RpcService:
         finally:
             if probe is not None:
                 probe.close()
+
+    def _demo_load(self) -> dict[str, Any]:
+        lexical, vectors = self._require_workspace()
+        assert self.workspace_path is not None
+        assert self.visual_index is not None
+        return install_demo_pack(
+            self.workspace_path,
+            lexical,
+            vectors,
+            self.embedding_provider,
+            visual_index=self.visual_index,
+            visual_embedding_provider=self.visual_embedding_provider,
+        )
 
     def _source_rows(self) -> list[dict[str, Any]]:
         lexical, _ = self._require_workspace()
@@ -858,6 +873,8 @@ class RpcService:
             return self._provider_snapshot()
         if method == "providers.set":
             return self._providers_set(params)
+        if method == "demo.load":
+            return self._demo_load()
         if method == "source.import":
             return self._import_source(params)
         if method == "source.list":

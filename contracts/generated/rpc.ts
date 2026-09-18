@@ -19,6 +19,7 @@ export interface ProviderSnapshot {
   secrets_persisted:false;
   secret_policy:string;
 }
+export interface DemoLoadResult { source_versions:Record<string,string>; dataset:EvalDatasetSummary; attack_manifest:AttackManifestSummary; suggested_question:string; source_directory:string; artifact_directory:string; }
 export interface SourceVersionSummary { source_version_id:string; logical_source_id:string; source_path:string; title:string; media_type:string; valid_from:string; valid_to:string|null; supersedes_source_version_id:string|null; superseded_by_source_version_id:string|null; }
 export interface ContextEvidence { evidence_id:string; chunk_id:string; text:string; source_version_id:string; locator:string|null; method:string; rank:number; evidence_kind:string; visual_evidence_id:string; modality:string; }
 export interface Citation { evidence_id:string; chunk_id:string; source_version_id:string; locator:string|null; evidence_kind:string; visual_evidence_id:string; modality:string; }

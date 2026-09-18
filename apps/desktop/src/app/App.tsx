@@ -189,6 +189,37 @@ export function App() {
     }
   }
 
+  async function loadFirstRunDemo() {
+    setBusy(true);
+    setError(null);
+    try {
+      const demo = await engine.loadDemo();
+      const [sourceState, , , health, providerState] = await Promise.all([
+        engine.listSources(),
+        refreshLab(),
+        refreshAttack(),
+        refreshWorkspaceHealth(),
+        refreshProviders(),
+      ]);
+      setSources(sourceState.sources);
+      setProviders(providerState);
+      setQuestion(demo.suggested_question);
+      const response = await engine.ask(demo.suggested_question);
+      setResult(response);
+      setTab("trace");
+      setStatus(
+        "Demo ready · " +
+          demo.dataset.name +
+          " · Trace opened · " +
+          response.answer.state,
+      );
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function browseSource() {
     setError(null);
     try {
@@ -761,6 +792,27 @@ export function App() {
                 </button>
               )}
             </div>
+          </section>
+        )}
+
+        {workspace && sources.length === 0 && (
+          <section className="demo-onboarding">
+            <div>
+              <span className="eyebrow">FIRST-RUN DEMO</span>
+              <strong>See the complete evidence loop with one local demo pack.</strong>
+              <small>
+                Installs versioned API evidence, authentication evidence, a Lab
+                benchmark, and a prompt-injection Attack fixture. Witness then
+                asks the temporal demo question and opens its real Trace.
+              </small>
+            </div>
+            <button
+              className="primary"
+              disabled={busy}
+              onClick={loadFirstRunDemo}
+            >
+              Load demo & open Trace
+            </button>
           </section>
         )}
 
