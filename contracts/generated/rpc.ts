@@ -5,7 +5,7 @@ export type RetrievalMode = "lexical" | "dense" | "hybrid" | "routed";
 export interface RpcRequest { v:1; id:string; method:string; params:Record<string,unknown>; }
 export interface RpcError { code:string; message:string; details?:Record<string,unknown>|null; }
 export type RpcEnvelope<T> = {v:1;id:string;type:"result";result:T}|{v:1;id:string;type:"error";error:RpcError};
-export interface WorkspaceOpenResult { path:string; database:string; source_versions:number; embedding_provider_id:string; }
+export interface WorkspaceOpenResult { path:string; database:string; source_versions:number; embedding_provider_id:string; visual_embedding_provider_id:string; }
 export interface SourceVersionSummary { source_version_id:string; logical_source_id:string; source_path:string; title:string; media_type:string; valid_from:string; valid_to:string|null; supersedes_source_version_id:string|null; superseded_by_source_version_id:string|null; }
 export interface ContextEvidence { evidence_id:string; chunk_id:string; text:string; source_version_id:string; locator:string|null; method:string; rank:number; }
 export interface Citation { evidence_id:string; chunk_id:string; source_version_id:string; locator:string|null; }

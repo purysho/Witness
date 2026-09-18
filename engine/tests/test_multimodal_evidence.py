@@ -236,3 +236,25 @@ def test_pdf_image_extraction_preserves_page_region(tmp_path):
         assert VisualEvidenceStore(lexical).asset_bytes(
             item.asset_sha256
         )
+
+
+def test_pdf_visuals_can_be_indexed_through_main_pipeline(tmp_path):
+    pdf_path = tmp_path / "pipeline-visual.pdf"
+    image = Image.new("RGB", (160, 80), (230, 230, 230))
+    image.save(pdf_path, format="PDF", resolution=72.0)
+
+    database = tmp_path / "witness.sqlite3"
+    provider = DeterministicHashVisualEmbeddingProvider(dimensions=16)
+    with LocalEvidenceIndex(database) as lexical:
+        visual_index = LocalVisualVectorIndex(lexical)
+        result = index_document(
+            pdf_path,
+            lexical,
+            visual_index=visual_index,
+            visual_embedding_provider=provider,
+        )
+
+        assert result.media_type == "application/pdf"
+        assert result.visual_evidence_count >= 1
+        assert result.visual_embedding_count >= 1
+        assert visual_index.count(provider.provider_id) >= 1

@@ -20,6 +20,10 @@ from ..evaluation import (
     load_dataset_file,
 )
 from ..graph.view import build_graph_snapshot
+from ..multimodal import (
+    DeterministicHashVisualEmbeddingProvider,
+    LocalVisualVectorIndex,
+)
 from ..pipeline import ask_evidence, index_document
 from ..retrieval import (
     DeterministicHashEmbeddingProvider,
@@ -75,8 +79,12 @@ class RpcService:
         self.workspace_path: Path | None = None
         self.lexical: LocalEvidenceIndex | None = None
         self.vectors: LocalVectorIndex | None = None
+        self.visual_index: LocalVisualVectorIndex | None = None
         self.embedding_provider = DeterministicHashEmbeddingProvider(
             dimensions=64
+        )
+        self.visual_embedding_provider = (
+            DeterministicHashVisualEmbeddingProvider(dimensions=64)
         )
 
     def close(self) -> None:
@@ -86,6 +94,7 @@ class RpcService:
         if self.lexical is not None:
             self.lexical.close()
             self.lexical = None
+        self.visual_index = None
         self.workspace_path = None
 
     def _require_workspace(
@@ -132,6 +141,7 @@ class RpcService:
         self.workspace_path = path
         self.lexical = LocalEvidenceIndex(database)
         self.vectors = LocalVectorIndex(database)
+        self.visual_index = LocalVisualVectorIndex(self.lexical)
         LocalHierarchyIndex(self.lexical)
         LocalTemporalIndex(self.lexical)
         LocalEvidenceGraph(self.lexical)
@@ -143,6 +153,9 @@ class RpcService:
             "database": str(database),
             "source_versions": len(self._source_rows()),
             "embedding_provider_id": self.embedding_provider.provider_id,
+            "visual_embedding_provider_id": (
+                self.visual_embedding_provider.provider_id
+            ),
         }
 
     def _source_rows(self) -> list[dict[str, Any]]:
@@ -183,12 +196,15 @@ class RpcService:
             if valid_from_raw
             else None
         )
+        assert self.visual_index is not None
         return asdict(
             index_document(
                 source_path,
                 lexical,
                 vector_index=vectors,
                 embedding_provider=self.embedding_provider,
+                visual_index=self.visual_index,
+                visual_embedding_provider=self.visual_embedding_provider,
                 valid_from=valid_from,
             )
         )
