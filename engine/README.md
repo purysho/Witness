@@ -36,7 +36,7 @@ SourceVersion
 
 Temporal metadata is version-aware. `index_document(..., valid_from=...)` may supply an explicit validity start; otherwise Witness records the file modification time as the baseline. Later versions of the same source path form a supersession chain without deleting earlier evidence.
 
-The graph baseline treats sentence-level propositions as claims and records explicit `claim -> supporting chunk` edges plus extracted entity anchors. This is intentionally deterministic. Future model-backed claim extraction can replace extraction while preserving the graph storage and retrieval contract.
+The graph uses a provider-neutral `ClaimExtractionProvider`. The default deterministic implementation treats sentence-level propositions as claims and records explicit `claim -> supporting chunk` edges plus entity anchors. A learned extractor can replace the provider without changing graph storage or retrieval contracts.
 
 Hierarchical retrieval preserves parser structure. Markdown headings, for example, can retrieve their child paragraphs as coherent context rather than forcing every answer to rely on isolated chunks.
 
@@ -98,7 +98,15 @@ A run records these stages:
 
 ```text
 query.received
-retrieval.completed
+query.normalized
+route.decided
+retrieval.lexical.completed
+retrieval.dense.completed
+retrieval.temporal.completed
+retrieval.hierarchical.completed
+retrieval.graph.completed
+fusion.completed
+rerank.completed
 evidence.reconciled
 sufficiency.decided
 context.built
@@ -107,4 +115,4 @@ answer.validated
 run.completed
 ```
 
-Trace payloads are structured artifacts such as route decisions, candidate lists, evidence relations, sufficiency features, context evidence IDs, and citation mappings. They do not contain hidden chain-of-thought.
+Trace payloads are versioned structured artifacts with stable event IDs: route decisions, per-route candidate lists, temporal selections, hierarchy expansions, graph paths, fusion/rerank movement, evidence relations, sufficiency features, context evidence IDs, and citation mappings. They do not contain hidden chain-of-thought.
