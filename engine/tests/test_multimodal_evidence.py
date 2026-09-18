@@ -441,7 +441,7 @@ def test_rpc_keeps_visual_search_advisory_without_semantic_provider(
         )
         visual = next(
             item
-            for item in route_event["payload"]["plan"]["routes"]
+            for item in route_event["payload"]["routes"]
             if item["route"] == "visual"
         )
         assert visual["requested"] is True
