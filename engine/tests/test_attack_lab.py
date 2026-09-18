@@ -340,3 +340,44 @@ def test_all_public_attack_fixtures_are_schema_valid():
         for path in sorted(fixture_root.glob("*.json"))
     ]
     assert {manifest.mutations[0].kind for manifest in manifests} == set(AttackKind)
+
+
+def test_attack_snapshot_fingerprint_is_reproducible(tmp_path):
+    workspace, provider, lexical, vectors = _workspace(tmp_path)
+    try:
+        manifest = AttackManifest(
+            attack_id="reproducible",
+            name="Reproducible",
+            mutations=(
+                AttackMutation(
+                    mutation_id="stable-distractor",
+                    kind=AttackKind.HIGH_SIMILARITY_DISTRACTOR,
+                    content="The API port deployment setting is documented here.",
+                ),
+            ),
+        )
+        runner = AttackRunner(
+            lexical,
+            vectors,
+            provider,
+            workspace_path=workspace,
+        )
+        config = EvalConfig(
+            retrieval_mode=RetrievalMode.HYBRID,
+            top_k=5,
+        )
+        first = runner.run(manifest, _dataset(), config)
+        second = runner.run(manifest, _dataset(), config)
+
+        assert first.run.snapshot_id == second.run.snapshot_id
+        assert (
+            first.run.attacked_corpus_fingerprint
+            == second.run.attacked_corpus_fingerprint
+        )
+        assert (
+            first.run.canonical_corpus_fingerprint
+            == second.run.canonical_corpus_fingerprint
+        )
+    finally:
+        vectors.close()
+        lexical.close()

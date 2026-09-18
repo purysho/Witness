@@ -120,7 +120,18 @@ class AttackRunner:
                     lexical,
                     vector_index=vectors,
                     embedding_provider=self.embedding_provider,
-                    valid_from=mutation.valid_from,
+                    valid_from=(
+                        mutation.valid_from
+                        or "2000-01-01T00:00:00+00:00"
+                    ),
+                    identity_key=(
+                        "attack://"
+                        + manifest.fingerprint
+                        + "/"
+                        + mutation.mutation_id
+                        + "/"
+                        + str(copy_index)
+                    ),
                 )
 
     def _evaluate_invariant(
@@ -362,6 +373,42 @@ class AttackRunner:
                     ),
                     *invariants,
                 )
+
+            clean_config = clean.run.config
+            attacked_config = attacked.run.config
+            pipeline_fields = (
+                "retrieval_mode",
+                "top_k",
+                "candidate_pool",
+                "rerank_pool",
+                "rrf_k",
+                "rerank",
+                "chunk_max_chars",
+                "embedding_provider_id",
+                "reranker_provider_id",
+                "generator_provider_id",
+            )
+            pipeline_unchanged = all(
+                getattr(clean_config, field) == getattr(attacked_config, field)
+                for field in pipeline_fields
+            )
+            invariants = (
+                *invariants,
+                AttackInvariantResult(
+                    invariant_id="pipeline-configuration-unchanged",
+                    kind="pipeline_configuration_unchanged",
+                    status=(
+                        AttackInvariantStatus.PASS
+                        if pipeline_unchanged
+                        else AttackInvariantStatus.FAIL
+                    ),
+                    detail=(
+                        "Attack evidence did not change retrieval settings or provider identities."
+                        if pipeline_unchanged
+                        else "Clean and attacked pipeline configuration/provider identities differ."
+                    ),
+                ),
+            )
 
             summary = AttackRunSummary(
                 attack_run_id=attack_run_id,

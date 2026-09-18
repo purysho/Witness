@@ -22,7 +22,8 @@ Current capabilities:
 - serializable retrieval traces showing route reasons, specialized-route artifacts, RRF contributions, and pre/post-rerank positions;
 - persisted RAG Lab datasets and runs with content-addressed dataset/corpus/configuration snapshots;
 - lexical-only, dense-only, hybrid, and routed benchmark execution over the production Ask pipeline;
-- objective retrieval, citation, abstention, contradiction, latency, and cost-availability metrics plus A/B comparison and JSON/CSV export.
+- objective retrieval, citation, abstention, contradiction, latency, and cost-availability metrics plus A/B comparison and JSON/CSV export;
+- isolated Attack Lab snapshots, content-addressed attack manifests, clean-vs-attacked execution, poisoning-aware source independence, deterministic invariants, persisted attack traces, and JSON/CSV export.
 
 ## Specialized retrieval
 
@@ -128,3 +129,12 @@ The evaluation package treats benchmarks as immutable evidence-engineering artif
 Objective metrics currently include Recall@K, Precision@K, MRR, nDCG@K, citation precision, citation coverage, an objective gold-reference unsupported-claim proxy, abstention correctness, contradiction handling, exact sufficiency-state accuracy, and latency. Cost is recorded when a provider exposes a numeric cost meter; local deterministic providers are explicitly marked as unmetered.
 
 Model-judged metrics have a separate field and are not mixed with objective metrics. See docs/evaluation.md.
+
+
+## Attack Lab
+
+Attack Lab is an orchestration layer around the production evaluation and Ask pipeline, not a second RAG implementation. It clones the canonical SQLite database with the SQLite backup API, materializes synthetic untrusted documents in a separate attack namespace, indexes them normally, and compares the same dataset/configuration against clean and attacked corpora.
+
+Attack evidence uses deterministic synthetic identity keys so repeated executions of the same manifest against the same canonical corpus reproduce the same attacked corpus fingerprint despite per-run physical snapshot paths. Exact-content duplicate sources are collapsed for independent-source counting to make duplicate-poisoning amplification visible rather than treating copies as corroboration.
+
+See `docs/attack-lab.md`.

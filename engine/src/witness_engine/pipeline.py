@@ -45,6 +45,7 @@ def index_document(
     vector_index: LocalVectorIndex | None = None,
     embedding_provider: EmbeddingProvider | None = None,
     valid_from: str | datetime | None = None,
+    identity_key: str | None = None,
 ) -> IndexingResult:
     """Extract, chunk, and index any supported local document.
 
@@ -62,9 +63,10 @@ def index_document(
         raise FileNotFoundError(source_path)
 
     digest = file_sha256(source_path)
+    source_identity = identity_key or str(source_path)
     source_version_id = stable_id(
         "source-version",
-        str(source_path),
+        source_identity,
         digest,
     )
     document = extract_document(source_path, source_version_id)
@@ -91,6 +93,7 @@ def index_document(
         media_type=document.media_type,
         observed_at=observed_at,
         valid_from=valid_from or observed_at,
+        logical_source_key=identity_key,
     )
 
     evidence_graph = LocalEvidenceGraph(index)

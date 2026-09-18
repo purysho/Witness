@@ -91,9 +91,13 @@ class LocalTemporalIndex:
         media_type: str,
         observed_at: str | datetime | None = None,
         valid_from: str | datetime | None = None,
+        logical_source_key: str | None = None,
     ) -> None:
         path = str(Path(source_path).expanduser().resolve())
-        logical_source_id = stable_id("source", path)
+        logical_source_id = stable_id(
+            "source",
+            logical_source_key or path,
+        )
         observed = _iso(observed_at)
         valid = _iso(valid_from, fallback=datetime.fromisoformat(observed))
 
