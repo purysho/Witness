@@ -3,12 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable
 
+from .csv_file import extract_csv_file
 from .docx import extract_docx_file
+from .html import extract_html_file
 from .markdown import extract_markdown_file
 from .models import ExtractedDocument
 from .pdf import extract_pdf_file
 from .plain_text import extract_text_file
+from .pptx import extract_pptx_file
 from .source_code import extract_source_code_file
+from .xlsx import extract_xlsx_file
 
 
 Extractor = Callable[[str | Path, str], ExtractedDocument]
@@ -58,7 +62,12 @@ _EXTRACTORS: dict[str, Extractor] = {
     ".md": extract_markdown_file,
     ".markdown": extract_markdown_file,
     ".pdf": extract_pdf_file,
+    ".html": extract_html_file,
+    ".htm": extract_html_file,
     ".docx": extract_docx_file,
+    ".pptx": extract_pptx_file,
+    ".xlsx": extract_xlsx_file,
+    ".csv": extract_csv_file,
 }
 
 
