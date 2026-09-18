@@ -32,7 +32,6 @@ def schema_text() -> str:
 WORKSPACE_TS = """export interface WorkspaceHealthIssue { code:string; severity:"warning"|"error"; repairable:boolean; detail:string; }
 export interface WorkspaceHealthReport { status:"healthy"|"repairable"|"attention"; issues:WorkspaceHealthIssue[]; protected_state_fingerprint:string; counts:Record<string,number>; }
 export interface WorkspaceRepairResult { before:WorkspaceHealthReport; after:WorkspaceHealthReport; actions:string[]; protected_state_unchanged:boolean; }
-
 """
 
 
