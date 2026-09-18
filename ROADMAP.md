@@ -2,7 +2,7 @@
 
 The build order is deliberately evidence-first. We will not start with a polished chat UI and retrofit provenance later.
 
-**Implementation status (2026-09-18): Phases 3, 4, 5, 6, and 7 complete; Phase 8 next.** Witness now has hybrid/specialized retrieval, evidence reconciliation/time/graph behavior, functional Ask/Trace/Graph/Lab/Attack surfaces, reproducible RAG evaluation, isolated adversarial testing, and provenance-safe multimodal evidence with routed retrieval, citations, visual inspection, and objective Lab coverage. Release hardening remains.
+**Implementation status (2026-09-19): Phases 0–8 complete; Witness V1 acceptance gate satisfied.** Witness now has structured mixed-format ingestion, hybrid/specialized retrieval, evidence reconciliation/time/graph behavior, functional Library/Ask/Trace/Graph/Lab/Attack surfaces, reproducible RAG evaluation, isolated adversarial testing, provenance-safe multimodal evidence, cancellable tasks, fail-closed recovery, first-run demo data, and clean-machine Windows packaging gates.
 
 ## Phase 0 — Specification and contracts
 
@@ -207,6 +207,8 @@ Exit gate:
 ---
 
 ## Phase 8 — Desktop completion + hardening
+
+**Status: Complete — 2026-09-19**
 
 **Goal:** turn the engine into a reliable daily-driver application.
 
