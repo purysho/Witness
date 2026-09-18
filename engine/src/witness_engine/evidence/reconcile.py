@@ -248,10 +248,10 @@ class EvidenceReconciler:
     ) -> str | None:
         rows = self.connection.execute(
             """
-            SELECT block_id, start_offset, chunk_id, text
+            SELECT locator, start_offset, text
             FROM indexed_chunks
             WHERE source_version_id = ?
-            ORDER BY block_id, start_offset, chunk_id
+            ORDER BY locator, start_offset, text
             """,
             (source_version_id,),
         ).fetchall()
@@ -259,6 +259,8 @@ class EvidenceReconciler:
             return None
         digest = sha256()
         for row in rows:
+            digest.update(str(row["locator"]).encode("utf-8"))
+            digest.update(b"\x1f")
             digest.update(str(row["text"]).encode("utf-8"))
             digest.update(b"\x1e")
         return digest.hexdigest()

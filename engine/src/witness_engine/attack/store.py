@@ -249,6 +249,11 @@ def export_attack_run(
         "recall_delta",
         "precision_delta",
         "citation_coverage_delta",
+        "added_evidence_count",
+        "removed_evidence_count",
+        "rank_changed_count",
+        "clean_answer_text",
+        "attacked_answer_text",
         "detail",
         "canonical_corpus_fingerprint",
         "attacked_corpus_fingerprint",
@@ -281,6 +286,11 @@ def export_attack_run(
                     "recall_delta": case.recall_delta,
                     "precision_delta": case.precision_delta,
                     "citation_coverage_delta": case.citation_coverage_delta,
+                    "added_evidence_count": case.added_evidence_count,
+                    "removed_evidence_count": case.removed_evidence_count,
+                    "rank_changed_count": case.rank_changed_count,
+                    "clean_answer_text": case.clean_answer_text,
+                    "attacked_answer_text": case.attacked_answer_text,
                 }
             )
         for invariant in result.invariants:
