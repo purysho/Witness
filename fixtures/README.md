@@ -10,7 +10,7 @@ Fixture groups:
 Fixtures must contain synthetic/public-safe data only. No private corpora or credentials belong in this repository.
 
 
-The eval directory includes an example schema-v1 benchmark. Gold evidence may identify chunks, immutable source versions, locators, source path suffixes, or a conjunction of those selectors.
+The eval directory includes text and multimodal schema-v1 benchmark examples. Gold evidence may identify chunks, visual-evidence IDs, immutable source versions, locators, source path suffixes, or a conjunction of those selectors.
 
 
 Attack fixtures embed their synthetic document payload directly in the manifest so the manifest fingerprint fully identifies the experiment. They are intended to be registered against a compatible Lab dataset and executed only through Attack Lab isolation.

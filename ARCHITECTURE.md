@@ -74,7 +74,7 @@ Provider interfaces rather than framework-owned chains:
 - `EmbeddingProvider`
 - `RerankProvider`
 - `GenerationProvider`
-- `VisionProvider`
+- `VisualEmbeddingProvider`
 - `ClaimExtractionProvider`
 
 A deterministic fake provider is mandatory for tests.
@@ -330,7 +330,8 @@ A candidate contains:
 - raw score;
 - rank;
 - reason metadata;
-- source/version/date metadata.
+- source/version/date metadata;
+- evidence kind plus visual-evidence ID/modality when the candidate is a page/image region.
 
 ### LexicalRetriever
 SQLite FTS5 / BM25 baseline.
@@ -347,8 +348,8 @@ Expands from matched entities/claims through bounded typed edges.
 ### TemporalRetriever
 Applies version/date relationships and freshness constraints.
 
-### MultimodalRetriever
-Reserved contract in V1; later handles page/image/chart embeddings and visual evidence.
+### Multimodal retrieval
+Implemented as an explicit transparent-router route over immutable visual evidence. PDF images are stored as content-addressed assets anchored to normalized page regions. A configured cross-modal `VisualEmbeddingProvider` maps image assets and text queries into the same vector space. Without a semantic provider, the visual route remains advisory rather than returning arbitrary hits.
 
 ---
 
@@ -361,7 +362,8 @@ Example route signals:
 - semantic explanatory query -> dense + lexical;
 - relationship/multi-hop wording -> graph expansion;
 - `when`, `before`, `after`, named dates, `current`, `originally` -> temporal route;
-- broad theme/summary -> hierarchical route.
+- broad theme/summary -> hierarchical route;
+- explicit image/chart/table/figure wording -> visual route when a semantic visual provider is configured.
 
 Every route emits a structured `RouteDecision` with reasons. A learned/LLM router can be added later and compared in Lab.
 
@@ -421,8 +423,8 @@ The generator receives a **context pack**, not arbitrary retrieved documents.
 Context pack contains:
 - question;
 - answer constraints;
-- selected evidence spans;
-- source/version/location metadata;
+- selected text spans and/or visual evidence regions;
+- source/version/location metadata, including visual page-region locators;
 - unresolved contradictions;
 - sufficiency state.
 
@@ -446,6 +448,7 @@ query.normalized
 route.decided
 retrieval.lexical.completed
 retrieval.dense.completed
+retrieval.visual.completed
 fusion.completed
 rerank.completed
 evidence.reconciled
@@ -502,7 +505,8 @@ A configuration snapshot freezes:
 - chunking;
 - fusion settings;
 - reranker;
-- answer provider/prompt version.
+- answer provider/prompt version;
+- visual embedding provider identity when routed multimodal retrieval is active.
 
 Lab runs configurations through identical cases and stores both metrics and trace IDs.
 
@@ -606,7 +610,9 @@ The engine returns structured errors. The desktop must not infer errors from log
 - lexical/dense retrieval;
 - persisted workspace reopen;
 - query trace replay;
-- provider failure handling.
+- provider failure handling;
+- visual evidence persistence/reopen and bounded preview;
+- routed text+visual citation flow and multimodal Lab scoring.
 
 ### Adversarial
 - prompt injection source;
@@ -655,3 +661,4 @@ These are non-negotiable:
 8. The UI cannot bypass the engine to mutate workspace evidence state directly.
 9. Derived indexes may be rebuilt; original source blobs and canonical metadata are authoritative.
 10. When the evidence boundary is insufficient, Witness must be able to say so.
+11. Visual citations must preserve the same immutable source-version and exact-locator guarantees as text citations; derived previews/embeddings never become evidence identity.
