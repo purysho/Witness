@@ -60,4 +60,4 @@ Witness is an **evidence and retrieval workbench**, not a general-purpose autono
 
 ## Status
 
-**Specification / architecture phase.** The repository is being built from the evidence model outward: provenance and reproducibility first, UI polish after the core contracts are stable.
+**Phases 3 and 4 complete.** Witness now has a functional local desktop path for Library, Ask, Trace, and Graph backed by typed local IPC, hybrid and specialized retrieval, explicit evidence sufficiency, contradiction/version handling, sentence-level citations, and inspectable stage-by-stage traces. RAG Lab, Attack Lab, multimodal evidence, and release hardening remain on the roadmap.
