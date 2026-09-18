@@ -1,0 +1,130 @@
+{
+  "error": {
+    "$defs": {
+      "RpcError": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Details"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "message"
+        ],
+        "title": "RpcError",
+        "type": "object"
+      }
+    },
+    "properties": {
+      "error": {
+        "$ref": "#/$defs/RpcError"
+      },
+      "id": {
+        "title": "Id",
+        "type": "string"
+      },
+      "type": {
+        "const": "error",
+        "default": "error",
+        "title": "Type",
+        "type": "string"
+      },
+      "v": {
+        "const": 1,
+        "default": 1,
+        "title": "V",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "id",
+      "error"
+    ],
+    "title": "RpcErrorEnvelope",
+    "type": "object"
+  },
+  "protocol_version": 1,
+  "request": {
+    "additionalProperties": false,
+    "properties": {
+      "id": {
+        "maxLength": 128,
+        "minLength": 1,
+        "title": "Id",
+        "type": "string"
+      },
+      "method": {
+        "maxLength": 96,
+        "minLength": 1,
+        "title": "Method",
+        "type": "string"
+      },
+      "params": {
+        "additionalProperties": true,
+        "title": "Params",
+        "type": "object"
+      },
+      "v": {
+        "const": 1,
+        "default": 1,
+        "title": "V",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "id",
+      "method"
+    ],
+    "title": "RpcRequest",
+    "type": "object"
+  },
+  "result": {
+    "properties": {
+      "id": {
+        "title": "Id",
+        "type": "string"
+      },
+      "result": {
+        "additionalProperties": true,
+        "title": "Result",
+        "type": "object"
+      },
+      "type": {
+        "const": "result",
+        "default": "result",
+        "title": "Type",
+        "type": "string"
+      },
+      "v": {
+        "const": 1,
+        "default": 1,
+        "title": "V",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "id",
+      "result"
+    ],
+    "title": "RpcResultEnvelope",
+    "type": "object"
+  }
+}

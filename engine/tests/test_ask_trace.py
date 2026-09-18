@@ -54,7 +54,15 @@ def test_ask_loop_returns_cited_answer_and_persists_append_only_trace(tmp_path):
     stages = tuple(event.stage for event in result.trace)
     assert stages == (
         "query.received",
-        "retrieval.completed",
+        "query.normalized",
+        "route.decided",
+        "retrieval.lexical.completed",
+        "retrieval.dense.completed",
+        "retrieval.temporal.completed",
+        "retrieval.hierarchical.completed",
+        "retrieval.graph.completed",
+        "fusion.completed",
+        "rerank.completed",
         "evidence.reconciled",
         "sufficiency.decided",
         "context.built",
@@ -62,6 +70,8 @@ def test_ask_loop_returns_cited_answer_and_persists_append_only_trace(tmp_path):
         "answer.validated",
         "run.completed",
     )
+    assert all(event.event_id for event in result.trace)
+    assert all(event.schema_version == 1 for event in result.trace)
 
     with LocalEvidenceIndex(database) as reopened:
         store = LocalRunStore(reopened)

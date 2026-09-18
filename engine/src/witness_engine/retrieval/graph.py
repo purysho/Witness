@@ -7,15 +7,12 @@ from dataclasses import asdict, dataclass
 from typing import Iterable
 
 from ..chunking import Chunk
+from ..graph.extraction import ClaimExtractionProvider, DeterministicClaimExtractionProvider
 from ..ids import stable_id
 from .index import LocalEvidenceIndex
 from .models import RetrievalCandidate
 
-_SENTENCE_RE = re.compile(r"(?<=[.!?])\s+|\n+")
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_./:#-]+", re.UNICODE)
-_ENTITY_RE = re.compile(
-    r"\b(?:[A-Z][A-Za-z0-9_-]*(?:\s+[A-Z][A-Za-z0-9_-]*)+|[A-Z]{2,}[A-Z0-9_-]*|[A-Za-z]+[-_][A-Za-z0-9_-]+)\b"
-)
 _STOPWORDS = {
     "a", "an", "and", "are", "as", "at", "be", "because", "been", "by", "for",
     "from", "has", "have", "how", "in", "is", "it", "of", "on", "or", "that",
@@ -53,34 +50,6 @@ def _normalize_claim(text: str) -> str:
     return " ".join(text.casefold().split())
 
 
-def _claim_sentences(text: str) -> tuple[str, ...]:
-    values: list[str] = []
-    for raw in _SENTENCE_RE.split(text):
-        sentence = " ".join(raw.strip().split())
-        tokens = _TOKEN_RE.findall(sentence)
-        if len(tokens) >= 3:
-            values.append(sentence)
-    return tuple(values)
-
-
-def _entity_names(text: str) -> tuple[str, ...]:
-    values: list[str] = []
-    for match in _ENTITY_RE.finditer(text):
-        name = " ".join(match.group(0).split())
-        if name and name.casefold() not in _STOPWORDS:
-            values.append(name)
-    # Identifiers are useful graph anchors even when they are not title case.
-    for token in _TOKEN_RE.findall(text):
-        lowered = token.casefold()
-        if lowered in _STOPWORDS:
-            continue
-        if any(char in token for char in ("_", "-", "/", ":", "#")) or (
-            any(char.isdigit() for char in token) and any(char.isalpha() for char in token)
-        ):
-            values.append(token)
-    return tuple(dict.fromkeys(values))
-
-
 class LocalEvidenceGraph:
     """A local claim -> evidence graph with optional entity expansion.
 
@@ -89,8 +58,13 @@ class LocalEvidenceGraph:
     extractor can replace extraction without changing graph retrieval contracts.
     """
 
-    def __init__(self, evidence_index: LocalEvidenceIndex) -> None:
+    def __init__(
+        self,
+        evidence_index: LocalEvidenceIndex,
+        extraction_provider: ClaimExtractionProvider | None = None,
+    ) -> None:
         self.index = evidence_index
+        self.extraction_provider = extraction_provider or DeterministicClaimExtractionProvider()
         self.connection = evidence_index.connection
         self.connection.executescript(
             """
@@ -140,7 +114,8 @@ class LocalEvidenceGraph:
         claim_edges = 0
         with self.connection:
             for chunk, _source_version_id, _locator in rows:
-                for sentence in _claim_sentences(chunk.text):
+                for extracted in self.extraction_provider.extract(chunk.text):
+                    sentence = extracted.text
                     normalized = _normalize_claim(sentence)
                     claim_id = stable_id("claim", normalized)
                     existing = self.connection.execute(
@@ -166,7 +141,7 @@ class LocalEvidenceGraph:
                     )
                     claim_edges += 1
 
-                    for entity_name in _entity_names(sentence):
+                    for entity_name in extracted.entities:
                         normalized_entity = entity_name.casefold()
                         entity_id = stable_id("entity", normalized_entity)
                         self.connection.execute(

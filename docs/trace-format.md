@@ -7,18 +7,28 @@ Witness Trace is a structured execution artifact, not a transcript of private re
 The first Ask pipeline emits append-only events in sequence:
 
 1. `query.received`
-2. `retrieval.completed`
-3. `evidence.reconciled`
-4. `sufficiency.decided`
-5. `context.built`
-6. `generation.completed`
-7. `answer.validated`
-8. `run.completed`
+2. `query.normalized`
+3. `route.decided`
+4. `retrieval.lexical.completed`
+5. `retrieval.dense.completed`
+6. `retrieval.temporal.completed`
+7. `retrieval.hierarchical.completed`
+8. `retrieval.graph.completed`
+9. `fusion.completed`
+10. `rerank.completed`
+11. `evidence.reconciled`
+12. `sufficiency.decided`
+13. `context.built`
+14. `generation.completed`
+15. `answer.validated`
+16. `run.completed`
 
 Each persisted event contains:
 
+- stable `event_id`
 - `run_id`
 - monotonic `sequence`
+- `schema_version`
 - `stage`
 - JSON `payload`
 - UTC `created_at`
@@ -27,7 +37,7 @@ The SQLite primary key `(run_id, sequence)` makes events append-only for a run. 
 
 ## Retrieval artifacts
 
-`retrieval.completed` contains the transparent route plan plus the actual lexical, dense, temporal, hierarchical, and graph route artifacts that executed. Fusion and reranking retain their pre/post positions.
+Retrieval is emitted as separate route/fusion/rerank events. The route decision, each raw candidate list, temporal selection, hierarchy expansion, graph paths, RRF contributions, and pre/post-rerank positions remain separately inspectable.
 
 ## Evidence reconciliation
 
