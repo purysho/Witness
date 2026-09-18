@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+import base64
+import os
 from dataclasses import asdict
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+from PIL import Image
 from pydantic import ValidationError
 
 from ..attack import AttackManifest, AttackRunner, AttackStore, export_attack_run
@@ -20,6 +24,13 @@ from ..evaluation import (
     load_dataset_file,
 )
 from ..graph.view import build_graph_snapshot
+from ..multimodal import (
+    DeterministicHashVisualEmbeddingProvider,
+    LocalVisualVectorIndex,
+    OpenClipVisualEmbeddingProvider,
+    VisualEmbeddingProvider,
+    VisualEvidenceStore,
+)
 from ..pipeline import ask_evidence, index_document
 from ..retrieval import (
     DeterministicHashEmbeddingProvider,
@@ -53,6 +64,7 @@ ALLOWED_METHODS = frozenset(
         "attack.runs",
         "attack.run.get",
         "attack.export",
+        "visual.evidence.get",
     }
 )
 
@@ -70,14 +82,46 @@ class RpcServiceError(RuntimeError):
         self.details = details
 
 
+def _configured_visual_provider() -> VisualEmbeddingProvider | None:
+    configured = os.environ.get(
+        "WITNESS_VISUAL_PROVIDER",
+        "",
+    ).strip().casefold()
+    if not configured:
+        return None
+    if configured == "hash":
+        return DeterministicHashVisualEmbeddingProvider(dimensions=64)
+    if configured == "openclip":
+        return OpenClipVisualEmbeddingProvider(
+            model_name=os.environ.get(
+                "WITNESS_OPENCLIP_MODEL",
+                "ViT-B-32",
+            ).strip() or "ViT-B-32",
+            pretrained=os.environ.get(
+                "WITNESS_OPENCLIP_PRETRAINED",
+                "laion2b_s34b_b79k",
+            ).strip() or "laion2b_s34b_b79k",
+            device=os.environ.get(
+                "WITNESS_OPENCLIP_DEVICE",
+                "cpu",
+            ).strip() or "cpu",
+        )
+    raise RuntimeError(
+        "Unsupported WITNESS_VISUAL_PROVIDER. "
+        "Use 'openclip', 'hash', or leave it unset."
+    )
+
+
 class RpcService:
     def __init__(self) -> None:
         self.workspace_path: Path | None = None
         self.lexical: LocalEvidenceIndex | None = None
         self.vectors: LocalVectorIndex | None = None
+        self.visual_index: LocalVisualVectorIndex | None = None
         self.embedding_provider = DeterministicHashEmbeddingProvider(
             dimensions=64
         )
+        self.visual_embedding_provider = _configured_visual_provider()
 
     def close(self) -> None:
         if self.vectors is not None:
@@ -86,6 +130,7 @@ class RpcService:
         if self.lexical is not None:
             self.lexical.close()
             self.lexical = None
+        self.visual_index = None
         self.workspace_path = None
 
     def _require_workspace(
@@ -132,6 +177,7 @@ class RpcService:
         self.workspace_path = path
         self.lexical = LocalEvidenceIndex(database)
         self.vectors = LocalVectorIndex(database)
+        self.visual_index = LocalVisualVectorIndex(self.lexical)
         LocalHierarchyIndex(self.lexical)
         LocalTemporalIndex(self.lexical)
         LocalEvidenceGraph(self.lexical)
@@ -143,6 +189,11 @@ class RpcService:
             "database": str(database),
             "source_versions": len(self._source_rows()),
             "embedding_provider_id": self.embedding_provider.provider_id,
+            "visual_embedding_provider_id": (
+                self.visual_embedding_provider.provider_id
+                if self.visual_embedding_provider is not None
+                else None
+            ),
         }
 
     def _source_rows(self) -> list[dict[str, Any]]:
@@ -183,12 +234,15 @@ class RpcService:
             if valid_from_raw
             else None
         )
+        assert self.visual_index is not None
         return asdict(
             index_document(
                 source_path,
                 lexical,
                 vector_index=vectors,
                 embedding_provider=self.embedding_provider,
+                visual_index=self.visual_index,
+                visual_embedding_provider=self.visual_embedding_provider,
                 valid_from=valid_from,
             )
         )
@@ -208,11 +262,18 @@ class RpcService:
             max(int(params.get("limit", 10)), 1),
             50,
         )
+        assert self.visual_index is not None
         return ask_evidence(
             question,
             lexical,
             vectors,
             self.embedding_provider,
+            visual_index=(
+                self.visual_index
+                if self.visual_embedding_provider is not None
+                else None
+            ),
+            visual_embedding_provider=self.visual_embedding_provider,
             limit=limit,
             candidate_pool=max(30, limit),
             rerank_pool=max(20, limit),
@@ -302,11 +363,18 @@ class RpcService:
             config = EvalConfig.model_validate(
                 params.get("config", {})
             )
+            assert self.visual_index is not None
             result = EvalRunner(
                 lexical,
                 vectors,
                 self.embedding_provider,
                 store=store,
+                visual_index=(
+                    self.visual_index
+                    if self.visual_embedding_provider is not None
+                    else None
+                ),
+                visual_embedding_provider=self.visual_embedding_provider,
             ).run(
                 dataset,
                 config,
@@ -432,6 +500,60 @@ class RpcService:
                 str(exc),
             ) from exc
         return result.model_dump(mode="json")
+
+    def _visual_evidence_get(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        lexical, _ = self._require_workspace()
+        visual_evidence_id = str(
+            params.get("visual_evidence_id", "")
+        ).strip()
+        if not visual_evidence_id:
+            raise RpcServiceError(
+                "invalid_params",
+                "visual.evidence.get requires visual_evidence_id",
+            )
+        store = VisualEvidenceStore(lexical)
+        try:
+            evidence = store.load(visual_evidence_id)
+            payload = store.asset_bytes(evidence.asset_sha256)
+        except KeyError as exc:
+            raise RpcServiceError(
+                "visual_evidence_not_found",
+                str(exc),
+            ) from exc
+
+        preview_data_url: str | None = None
+        preview_warning: str | None = None
+        try:
+            with Image.open(BytesIO(payload)) as image:
+                preview = image.convert("RGB")
+                preview.thumbnail((640, 640))
+                buffer = BytesIO()
+                preview.save(
+                    buffer,
+                    format="JPEG",
+                    quality=78,
+                    optimize=True,
+                )
+                encoded = base64.b64encode(
+                    buffer.getvalue()
+                ).decode("ascii")
+                preview_data_url = (
+                    "data:image/jpeg;base64," + encoded
+                )
+        except Exception as exc:
+            preview_warning = (
+                "Preview unavailable: "
+                f"{type(exc).__name__}: {exc}"
+            )
+
+        return {
+            "evidence": evidence.model_dump(mode="json"),
+            "preview_data_url": preview_data_url,
+            "preview_warning": preview_warning,
+        }
 
     def handle(
         self,
@@ -629,5 +751,7 @@ class RpcService:
                     str(exc),
                 ) from exc
             return {"path": str(path), "format": format_value}
+        if method == "visual.evidence.get":
+            return self._visual_evidence_get(params)
 
         raise AssertionError(method)

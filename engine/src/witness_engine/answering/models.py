@@ -34,6 +34,9 @@ class Citation:
     chunk_id: str
     source_version_id: str
     locator: str | None
+    evidence_kind: str = "text"
+    visual_evidence_id: str = ""
+    modality: str = ""
 
 
 @dataclass(frozen=True)

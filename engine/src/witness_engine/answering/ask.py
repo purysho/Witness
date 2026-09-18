@@ -103,6 +103,16 @@ class AskEngine:
         )
         self.run_store.append(
             run_id,
+            "retrieval.visual.completed",
+            {
+                "provider_id": retrieval.trace.visual_embedding_provider_id,
+                "candidates": [
+                    asdict(item) for item in retrieval.trace.visual_candidates
+                ],
+            },
+        )
+        self.run_store.append(
+            run_id,
             "retrieval.temporal.completed",
             {
                 "selection": (

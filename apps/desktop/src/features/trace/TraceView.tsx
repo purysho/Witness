@@ -16,7 +16,13 @@ function TraceRow({event}:{event:TraceEvent}) {
   );
 }
 
-export function TraceView({result}:{result:AskResult|null}) {
+export function TraceView({
+  result,
+  onOpenVisual,
+}:{
+  result:AskResult|null;
+  onOpenVisual:(visualEvidenceId:string)=>void;
+}) {
   if (!result) return (
     <section className="panel full-panel">
       <span className="eyebrow">TRACE</span><h2>No query run selected</h2>
@@ -54,7 +60,19 @@ export function TraceView({result}:{result:AskResult|null}) {
         </dl>
         <h3>Citations</h3>
         <div className="citation-list">{result.answer.citations.map(c=>(
-          <article key={c.evidence_id}><code>{c.evidence_id.slice(0,12)}</code><span>{c.locator??"no locator"}</span><small>{c.source_version_id.slice(0,12)}</small></article>
+          <article key={c.evidence_id}>
+            <code>{c.evidence_id.slice(0,12)}</code>
+            <span>{c.locator??"no locator"}</span>
+            <small>{c.source_version_id.slice(0,12)}</small>
+            {c.evidence_kind === "visual" && c.visual_evidence_id && (
+              <button
+                className="visual-open"
+                onClick={() => onOpenVisual(c.visual_evidence_id)}
+              >
+                Open {c.modality || "visual"}
+              </button>
+            )}
+          </article>
         ))}</div>
       </section>
     </div>

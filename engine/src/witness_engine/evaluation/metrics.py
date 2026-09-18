@@ -15,6 +15,7 @@ from .models import EvalCase, EvalCaseMetrics, EvalCaseResult, EvalRunMetrics, G
 @dataclass(frozen=True)
 class CandidateMeta:
     chunk_id: str
+    visual_evidence_id: str
     source_version_id: str
     locator: str
     source_path: str
@@ -26,6 +27,11 @@ def _norm_path(value: str) -> str:
 
 def evidence_matches(ref: GoldEvidenceRef, candidate: CandidateMeta) -> bool:
     if ref.chunk_id and ref.chunk_id != candidate.chunk_id:
+        return False
+    if (
+        ref.visual_evidence_id
+        and ref.visual_evidence_id != candidate.visual_evidence_id
+    ):
         return False
     if ref.source_version_id and ref.source_version_id != candidate.source_version_id:
         return False
@@ -88,6 +94,7 @@ def score_case(
     candidate_meta = [
         CandidateMeta(
             chunk_id=item.chunk_id,
+            visual_evidence_id=item.visual_evidence_id,
             source_version_id=item.source_version_id,
             locator=item.locator,
             source_path=source_paths.get(item.source_version_id, ""),
@@ -113,6 +120,7 @@ def score_case(
     context_by_id = {
         item.evidence_id: CandidateMeta(
             chunk_id=item.chunk_id,
+            visual_evidence_id=item.visual_evidence_id,
             source_version_id=item.source_version_id,
             locator=item.locator or "",
             source_path=source_paths.get(item.source_version_id, ""),

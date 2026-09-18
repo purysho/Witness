@@ -15,6 +15,7 @@ import {
   type RpcEnvelope,
   type RpcRequest,
   type SourceVersionSummary,
+  type VisualEvidencePreview,
   type WorkspaceOpenResult,
 } from "../../../../contracts/generated/rpc";
 
@@ -58,6 +59,10 @@ export const engine = {
     ),
   graph: (limit = 160) =>
     call<GraphSnapshot>("graph.snapshot", { limit }),
+  visualEvidence: (visualEvidenceId: string) =>
+    call<VisualEvidencePreview>("visual.evidence.get", {
+      visual_evidence_id: visualEvidenceId,
+    }),
 
   labLoadDataset: (path: string) =>
     call<EvalDatasetSummary>("lab.dataset.load", { path }),

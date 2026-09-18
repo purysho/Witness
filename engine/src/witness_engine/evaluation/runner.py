@@ -7,6 +7,7 @@ import json
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
+import sqlite3
 from time import perf_counter
 from typing import Sequence
 from uuid import uuid4
@@ -17,6 +18,7 @@ from ..answering import (
     GenerationProvider,
 )
 from ..ids import stable_id
+from ..multimodal import LocalVisualVectorIndex, VisualEmbeddingProvider
 from ..retrieval import (
     DeterministicTokenReranker,
     EmbeddingProvider,
@@ -78,6 +80,7 @@ class FixedRetrievalRouter:
             "temporal",
             "graph",
             "hierarchical",
+            "visual",
         ):
             requested = route in enabled and bool(features.normalized_query)
             reason = (
@@ -129,6 +132,32 @@ def corpus_fingerprint(index: LocalEvidenceIndex) -> str:
             ).encode("utf-8")
         )
         digest.update(b"\x1e")
+
+    try:
+        visual_rows = index.connection.execute(
+            """
+            SELECT visual_evidence_id, source_version_id, modality,
+                   locator, asset_sha256
+            FROM visual_evidence
+            ORDER BY visual_evidence_id
+            """
+        ).fetchall()
+    except sqlite3.OperationalError:
+        visual_rows = ()
+
+    for row in visual_rows:
+        digest.update(
+            "\x1f".join(
+                (
+                    row["visual_evidence_id"],
+                    row["source_version_id"],
+                    row["modality"],
+                    row["locator"],
+                    row["asset_sha256"],
+                )
+            ).encode("utf-8")
+        )
+        digest.update(b"\x1e")
     return digest.hexdigest()
 
 
@@ -165,10 +194,18 @@ class EvalRunner:
         reranker: RerankProvider | None = None,
         generator: GenerationProvider | None = None,
         store: EvalStore | None = None,
+        visual_index: LocalVisualVectorIndex | None = None,
+        visual_embedding_provider: VisualEmbeddingProvider | None = None,
     ) -> None:
+        if (visual_index is None) != (visual_embedding_provider is None):
+            raise ValueError(
+                "visual_index and visual_embedding_provider must be supplied together"
+            )
         self.lexical = lexical_index
         self.vectors = vector_index
         self.embedding_provider = embedding_provider
+        self.visual_index = visual_index
+        self.visual_embedding_provider = visual_embedding_provider
         self.default_reranker = (
             reranker or DeterministicTokenReranker()
         )
@@ -179,7 +216,12 @@ class EvalRunner:
 
     def _router(self, mode: RetrievalMode):
         if mode == RetrievalMode.ROUTED:
-            return TransparentRetrievalRouter()
+            return TransparentRetrievalRouter(
+                visual_available=(
+                    self.visual_index is not None
+                    and self.visual_embedding_provider is not None
+                )
+            )
         return FixedRetrievalRouter(mode)
 
     def run(
@@ -198,6 +240,14 @@ class EvalRunner:
             reranker_provider_id=reranker.provider_id,
             generator_provider_id=self.generator.provider_id,
             corpus_fingerprint=corpus_fingerprint(self.lexical),
+            visual_embedding_provider_id=(
+                self.visual_embedding_provider.provider_id
+                if (
+                    config.retrieval_mode == RetrievalMode.ROUTED
+                    and self.visual_embedding_provider is not None
+                )
+                else None
+            ),
         )
         run_id = stable_id(
             "eval-run",
@@ -215,11 +265,17 @@ class EvalRunner:
 
         for case in dataset.cases:
             started = perf_counter()
-            providers = (
+            providers = [
                 self.embedding_provider,
                 reranker,
                 self.generator,
-            )
+            ]
+            if (
+                config.retrieval_mode == RetrievalMode.ROUTED
+                and self.visual_embedding_provider is not None
+            ):
+                providers.append(self.visual_embedding_provider)
+            providers = tuple(providers)
             cost_before = [
                 _provider_cost(provider)
                 for provider in providers
@@ -231,6 +287,16 @@ class EvalRunner:
                     self.embedding_provider,
                     router=self._router(config.retrieval_mode),
                     reranker=reranker,
+                    visual_index=(
+                        self.visual_index
+                        if config.retrieval_mode == RetrievalMode.ROUTED
+                        else None
+                    ),
+                    visual_embedding_provider=(
+                        self.visual_embedding_provider
+                        if config.retrieval_mode == RetrievalMode.ROUTED
+                        else None
+                    ),
                 )
                 ask_result = AskEngine(
                     retriever,

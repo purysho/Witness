@@ -5,10 +5,10 @@ export type RetrievalMode = "lexical" | "dense" | "hybrid" | "routed";
 export interface RpcRequest { v:1; id:string; method:string; params:Record<string,unknown>; }
 export interface RpcError { code:string; message:string; details?:Record<string,unknown>|null; }
 export type RpcEnvelope<T> = {v:1;id:string;type:"result";result:T}|{v:1;id:string;type:"error";error:RpcError};
-export interface WorkspaceOpenResult { path:string; database:string; source_versions:number; embedding_provider_id:string; }
+export interface WorkspaceOpenResult { path:string; database:string; source_versions:number; embedding_provider_id:string; visual_embedding_provider_id:string|null; }
 export interface SourceVersionSummary { source_version_id:string; logical_source_id:string; source_path:string; title:string; media_type:string; valid_from:string; valid_to:string|null; supersedes_source_version_id:string|null; superseded_by_source_version_id:string|null; }
-export interface ContextEvidence { evidence_id:string; chunk_id:string; text:string; source_version_id:string; locator:string|null; method:string; rank:number; }
-export interface Citation { evidence_id:string; chunk_id:string; source_version_id:string; locator:string|null; }
+export interface ContextEvidence { evidence_id:string; chunk_id:string; text:string; source_version_id:string; locator:string|null; method:string; rank:number; evidence_kind:string; visual_evidence_id:string; modality:string; }
+export interface Citation { evidence_id:string; chunk_id:string; source_version_id:string; locator:string|null; evidence_kind:string; visual_evidence_id:string; modality:string; }
 export interface AnswerSentence { text:string; evidence_ids:string[]; }
 export interface TraceEvent { event_id:string; run_id:string; sequence:number; schema_version:number; stage:string; payload:Record<string,unknown>; created_at:string; }
 export interface AskResult {
@@ -26,7 +26,7 @@ export interface GraphSnapshot { nodes:GraphNode[]; edges:GraphEdge[]; }
 
 export interface EvalDatasetSummary { dataset_fingerprint:string; dataset_id:string; name:string; description:string; case_count:number; registered_at:string; }
 export interface EvalConfigInput { name:string; retrieval_mode:RetrievalMode; top_k:number; candidate_pool:number; rerank_pool:number; rrf_k:number; rerank:boolean; chunk_max_chars:number; }
-export interface EvalConfigSnapshot extends EvalConfigInput { config_id:string; corpus_fingerprint:string; embedding_provider_id:string; reranker_provider_id:string; generator_provider_id:string; }
+export interface EvalConfigSnapshot extends EvalConfigInput { config_id:string; corpus_fingerprint:string; embedding_provider_id:string; reranker_provider_id:string; generator_provider_id:string; visual_embedding_provider_id:string|null; }
 export interface EvalRunMetrics { objective:Record<string,number>; model_judged:Record<string,number>; case_count:number; passed_cases:number; failed_cases:number; total_latency_ms:number; mean_latency_ms:number; p95_latency_ms:number; total_cost_usd:number|null; cost_available:boolean; }
 export interface EvalRunSummary { run_id:string; dataset_fingerprint:string; dataset_id:string; dataset_name:string; config:EvalConfigSnapshot; status:string; started_at:string; completed_at:string|null; metrics:EvalRunMetrics|null; }
 export interface EvalCaseMetrics { recall_at_k:number|null; precision_at_k:number|null; reciprocal_rank:number|null; ndcg_at_k:number|null; citation_precision:number|null; citation_coverage:number|null; unsupported_claim_rate:number|null; abstention_correct:boolean|null; contradiction_handling_correct:boolean|null; state_correct:boolean|null; answer_contains_correct:boolean|null; latency_ms:number; cost_usd:number|null; cost_available:boolean; matched_gold_count:number; gold_count:number; retrieved_count:number; passed:boolean; failure_reasons:string[]; }
@@ -36,6 +36,10 @@ export interface LabCaseDetail extends Omit<EvalCaseSummary,"has_trace"> { ask_r
 export interface LabMetricComparison { metric:string; a:number|null; b:number|null; delta:number|null; kind:"objective"; }
 export interface LabCaseComparison { case_id:string; question:string; a_passed:boolean; b_passed:boolean; a_state:SufficiencyState|null; b_state:SufficiencyState|null; a_query_run_id:string|null; b_query_run_id:string|null; a_failures:string[]; b_failures:string[]; }
 export interface LabComparison { dataset_fingerprint:string; dataset_id:string; dataset_name:string; run_a:EvalRunSummary; run_b:EvalRunSummary; metrics:LabMetricComparison[]; model_judged_metrics:Array<Record<string,unknown>>; cases:LabCaseComparison[]; failed_cases:LabCaseComparison[]; }
+
+export interface VisualRegion { x0:number; y0:number; x1:number; y1:number; }
+export interface VisualEvidenceDetail { visual_evidence_id:string; source_version_id:string; modality:"image"|"figure"|"chart"|"table"|"page_region"; page_number:number; region:VisualRegion; locator:string; asset_sha256:string; media_type:string; width_px:number|null; height_px:number|null; label_text:string; }
+export interface VisualEvidencePreview { evidence:VisualEvidenceDetail; preview_data_url:string|null; preview_warning:string|null; }
 
 export interface AttackManifestSummary { manifest_fingerprint:string; attack_id:string; name:string; description:string; mutation_count:number; registered_at?:string; }
 export interface AttackInvariantResult { invariant_id:string; kind:string; status:"PASS"|"FAIL"|"NOT_APPLICABLE"; case_id:string|null; detail:string; }

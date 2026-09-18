@@ -58,6 +58,7 @@ def test_ask_loop_returns_cited_answer_and_persists_append_only_trace(tmp_path):
         "route.decided",
         "retrieval.lexical.completed",
         "retrieval.dense.completed",
+        "retrieval.visual.completed",
         "retrieval.temporal.completed",
         "retrieval.hierarchical.completed",
         "retrieval.graph.completed",

@@ -11,6 +11,11 @@ from .answering.providers import GenerationProvider
 from .chunking import chunk_block
 from .ids import file_sha256, stable_id
 from .ingestion.registry import extract_document
+from .multimodal import (
+    LocalVisualVectorIndex,
+    VisualEmbeddingProvider,
+    index_pdf_visual_evidence,
+)
 from .retrieval.adaptive import AdaptiveRetrievalResult, RoutedRetriever
 from .retrieval.embeddings import EmbeddingProvider
 from .retrieval.graph import LocalEvidenceGraph
@@ -35,6 +40,9 @@ class IndexingResult:
     warnings: tuple[str, ...] = ()
     embedded_chunk_count: int = 0
     claim_edge_count: int = 0
+    visual_evidence_count: int = 0
+    visual_embedding_count: int = 0
+    visual_warnings: tuple[str, ...] = ()
 
 
 def index_document(
@@ -44,6 +52,8 @@ def index_document(
     max_chars: int = 1200,
     vector_index: LocalVectorIndex | None = None,
     embedding_provider: EmbeddingProvider | None = None,
+    visual_index: LocalVisualVectorIndex | None = None,
+    visual_embedding_provider: VisualEmbeddingProvider | None = None,
     valid_from: str | datetime | None = None,
     identity_key: str | None = None,
 ) -> IndexingResult:
@@ -56,6 +66,10 @@ def index_document(
     if (vector_index is None) != (embedding_provider is None):
         raise ValueError(
             "vector_index and embedding_provider must be supplied together"
+        )
+    if visual_index is None and visual_embedding_provider is not None:
+        raise ValueError(
+            "visual_embedding_provider requires visual_index"
         )
 
     source_path = Path(path).expanduser().resolve()
@@ -106,6 +120,31 @@ def index_document(
             source_version_id=source_version_id,
         )
 
+    visual_evidence_count = 0
+    visual_embedding_count = 0
+    visual_warnings: tuple[str, ...] = ()
+    if (
+        document.media_type == "application/pdf"
+        and visual_index is not None
+    ):
+        try:
+            visual_result = index_pdf_visual_evidence(
+                source_path,
+                source_version_id,
+                index,
+            )
+            visual_evidence_count = len(visual_result.evidence)
+            visual_warnings = visual_result.warnings
+            if visual_embedding_provider is not None:
+                visual_embedding_count = visual_index.sync(
+                    visual_embedding_provider
+                )
+        except Exception as exc:
+            visual_warnings = (
+                "visual extraction failed "
+                f"({type(exc).__name__}: {exc})",
+            )
+
     return IndexingResult(
         path=str(source_path),
         source_version_id=source_version_id,
@@ -116,6 +155,9 @@ def index_document(
         warnings=document.warnings,
         embedded_chunk_count=embedded_chunk_count,
         claim_edge_count=claim_edge_count,
+        visual_evidence_count=visual_evidence_count,
+        visual_embedding_count=visual_embedding_count,
+        visual_warnings=visual_warnings,
     )
 
 
@@ -181,6 +223,8 @@ def search_routed_evidence(
     vector_index: LocalVectorIndex,
     embedding_provider: EmbeddingProvider,
     *,
+    visual_index: LocalVisualVectorIndex | None = None,
+    visual_embedding_provider: VisualEmbeddingProvider | None = None,
     limit: int = 10,
     candidate_pool: int = 30,
     rerank_pool: int = 20,
@@ -196,6 +240,8 @@ def search_routed_evidence(
         embedding_provider,
         router=router,
         reranker=reranker,
+        visual_index=visual_index,
+        visual_embedding_provider=visual_embedding_provider,
     ).search(
         query,
         limit=limit,
@@ -211,6 +257,8 @@ def ask_evidence(
     vector_index: LocalVectorIndex,
     embedding_provider: EmbeddingProvider,
     *,
+    visual_index: LocalVisualVectorIndex | None = None,
+    visual_embedding_provider: VisualEmbeddingProvider | None = None,
     limit: int = 10,
     candidate_pool: int = 30,
     rerank_pool: int = 20,
@@ -227,6 +275,8 @@ def ask_evidence(
         embedding_provider,
         router=router,
         reranker=reranker,
+        visual_index=visual_index,
+        visual_embedding_provider=visual_embedding_provider,
     )
     return AskEngine(
         retriever,

@@ -11,80 +11,29 @@ _YEAR_RE = re.compile(r"\b(?:19|20)\d{2}\b")
 _TOKEN_RE = re.compile(r"[A-Za-z0-9_./:#-]+", re.UNICODE)
 
 _TEMPORAL_TERMS = {
-    "after",
-    "before",
-    "changed",
-    "change",
-    "current",
-    "currently",
-    "earlier",
-    "history",
-    "historical",
-    "latest",
-    "later",
-    "now",
-    "previous",
-    "previously",
-    "since",
-    "today",
-    "version",
-    "versions",
-    "when",
+    "after", "before", "changed", "change", "current", "currently", "earlier",
+    "history", "historical", "latest", "later", "now", "previous", "previously",
+    "since", "today", "version", "versions", "when",
 }
 _RELATIONAL_TERMS = {
-    "affect",
-    "affected",
-    "because",
-    "between",
-    "cause",
-    "caused",
-    "connected",
-    "connection",
-    "connections",
-    "depend",
-    "dependency",
-    "dependencies",
-    "depends",
-    "downstream",
-    "impact",
-    "influence",
-    "related",
-    "relationship",
-    "relationships",
-    "upstream",
-    "why",
+    "affect", "affected", "because", "between", "cause", "caused", "connected",
+    "connection", "connections", "depend", "dependency", "dependencies", "depends",
+    "downstream", "impact", "influence", "related", "relationship",
+    "relationships", "upstream", "why",
 }
 _BROAD_TERMS = {
-    "all",
-    "across",
-    "overview",
-    "pattern",
-    "patterns",
-    "summarize",
-    "summary",
-    "theme",
-    "themes",
-    "trend",
-    "trends",
+    "all", "across", "overview", "pattern", "patterns", "summarize", "summary",
+    "theme", "themes", "trend", "trends",
 }
-_EXPLANATORY_TERMS = {
-    "explain",
-    "how",
-    "reason",
-    "reasons",
-    "why",
-}
+_EXPLANATORY_TERMS = {"explain", "how", "reason", "reasons", "why"}
 _EXACT_LOOKUP_TERMS = {
-    "file",
-    "id",
-    "identifier",
-    "name",
-    "path",
-    "port",
-    "setting",
-    "url",
-    "value",
-    "version",
+    "file", "id", "identifier", "name", "path", "port", "setting", "url",
+    "value", "version",
+}
+_VISUAL_TERMS = {
+    "chart", "charts", "diagram", "diagrams", "figure", "figures", "graph",
+    "graphs", "image", "images", "photo", "photos", "picture", "pictures",
+    "plot", "plots", "table", "tables", "visual", "visuals",
 }
 
 
@@ -98,6 +47,7 @@ class QueryFeatures:
     quoted_phrases: tuple[str, ...]
     identifiers: tuple[str, ...]
     temporal_signals: tuple[str, ...]
+    visual_signals: tuple[str, ...]
     comparison: bool
     relational: bool
     broad_summary: bool
@@ -143,6 +93,7 @@ def analyze_query(query: str) -> QueryFeatures:
 
     temporal = set(token_set.intersection(_TEMPORAL_TERMS))
     temporal.update(_YEAR_RE.findall(normalized))
+    visual = tuple(sorted(token_set.intersection(_VISUAL_TERMS)))
 
     comparison = bool(
         token_set.intersection({"compare", "comparison", "versus", "vs", "difference", "differences"})
@@ -165,6 +116,7 @@ def analyze_query(query: str) -> QueryFeatures:
         quoted_phrases=tuple(quoted),
         identifiers=identifiers,
         temporal_signals=tuple(sorted(temporal)),
+        visual_signals=visual,
         comparison=comparison,
         relational=relational,
         broad_summary=broad_summary,

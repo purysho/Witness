@@ -46,26 +46,36 @@ class RetrievalPlan:
 class TransparentRetrievalRouter:
     """Rule-based baseline whose decisions are reproducible and inspectable.
 
-    V1 routes are explicit and mechanical. Lexical, dense, temporal, graph, and
-    hierarchical retrieval are all executable; the router records why each route
-    was requested instead of hiding the decision in a model call.
+    Visual retrieval is requested only when the query contains an explicit
+    visual signal. The route is marked advisory rather than silently executed
+    when no visual index/provider is configured.
     """
+
+    def __init__(self, *, visual_available: bool = False) -> None:
+        self.visual_available = visual_available
 
     def plan(self, query: str) -> RetrievalPlan:
         features = analyze_query(query)
+        route_names = (
+            "lexical",
+            "dense",
+            "temporal",
+            "graph",
+            "hierarchical",
+            "visual",
+        )
         if not features.normalized_query:
             return RetrievalPlan(
                 query=query,
                 features=features,
                 routes=tuple(
-                    RouteDecision(route, False, True, ("empty query",))
-                    for route in (
-                        "lexical",
-                        "dense",
-                        "temporal",
-                        "graph",
-                        "hierarchical",
+                    RouteDecision(
+                        route,
+                        False,
+                        self.visual_available if route == "visual" else True,
+                        ("empty query",),
                     )
+                    for route in route_names
                 ),
             )
 
@@ -87,6 +97,7 @@ class TransparentRetrievalRouter:
             or features.broad_summary
             or features.comparison
             or features.temporal_signals
+            or features.visual_signals
             or not features.exact_lookup
         )
         if features.explanatory:
@@ -99,11 +110,10 @@ class TransparentRetrievalRouter:
             dense_reasons.append("comparison query benefits from semantic matching")
         if features.temporal_signals:
             dense_reasons.append("temporal question keeps semantic coverage alongside version-aware retrieval")
+        if features.visual_signals:
+            dense_reasons.append("visual query keeps textual semantic evidence alongside visual retrieval")
         if not features.exact_lookup:
             dense_reasons.append("no exact-lookup signal; semantic retrieval retained")
-
-        lexical_requested = True
-        dense_requested = semantic_need or not lexical_reasons
 
         temporal_reasons = (
             ("temporal/version signal detected",)
@@ -120,6 +130,19 @@ class TransparentRetrievalRouter:
             if features.broad_summary
             else ("no broad summary signal detected",)
         )
+        visual_requested = bool(features.visual_signals)
+        visual_reasons = (
+            (
+                "explicit visual signal detected: "
+                + ", ".join(features.visual_signals),
+            )
+            if visual_requested and self.visual_available
+            else (
+                "visual signal detected but no visual provider/index is configured",
+            )
+            if visual_requested
+            else ("no explicit visual signal detected",)
+        )
 
         return RetrievalPlan(
             query=query,
@@ -127,13 +150,13 @@ class TransparentRetrievalRouter:
             routes=(
                 RouteDecision(
                     "lexical",
-                    lexical_requested,
+                    True,
                     True,
                     tuple(lexical_reasons or ["lexical baseline retained"]),
                 ),
                 RouteDecision(
                     "dense",
-                    dense_requested,
+                    semantic_need or not lexical_reasons,
                     True,
                     tuple(dense_reasons or ["exact compact lookup does not require dense retrieval"]),
                 ),
@@ -154,6 +177,12 @@ class TransparentRetrievalRouter:
                     features.broad_summary,
                     True,
                     hierarchical_reasons,
+                ),
+                RouteDecision(
+                    "visual",
+                    visual_requested,
+                    self.visual_available,
+                    visual_reasons,
                 ),
             ),
         )

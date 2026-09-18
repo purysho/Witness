@@ -146,3 +146,19 @@ def test_routed_retriever_executes_plan_and_serializes_trace(tmp_path):
     json.dumps(payload)
     assert payload["plan"]["features"]["relational"] is True
     assert payload["reranker_provider_id"].startswith("deterministic-token-reranker")
+
+
+
+def test_router_marks_visual_queries_advisory_until_provider_is_available():
+    unavailable = TransparentRetrievalRouter().plan(
+        "What does the revenue chart show?"
+    )
+    available = TransparentRetrievalRouter(
+        visual_available=True
+    ).plan("What does the revenue chart show?")
+
+    assert unavailable.decision("visual").requested is True
+    assert unavailable.decision("visual").executable is False
+    assert "visual" in unavailable.advisory_routes
+    assert available.should_run("visual") is True
+    assert available.features.visual_signals == ("chart",)
