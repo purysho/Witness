@@ -4,9 +4,10 @@ import { StateBadge } from "../../components/StateBadge";
 interface Props {
   question:string; result:AskResult|null; busy:boolean; workspaceReady:boolean;
   onQuestion:(value:string)=>void; onAsk:()=>void; onOpenTrace:()=>void;
+  onOpenVisual:(visualEvidenceId:string)=>void;
 }
 
-export function AskView({question,result,busy,workspaceReady,onQuestion,onAsk,onOpenTrace}:Props) {
+export function AskView({question,result,busy,workspaceReady,onQuestion,onAsk,onOpenTrace,onOpenVisual}:Props) {
   return (
     <div className="view-grid ask-grid">
       <section className="panel ask-panel">
@@ -52,9 +53,23 @@ export function AskView({question,result,busy,workspaceReady,onQuestion,onAsk,on
         <div className="evidence-list">
           {result ? result.context.evidence.map(item=>(
             <article className="evidence-card" id={`evidence-${item.evidence_id}`} key={item.evidence_id}>
-              <div className="evidence-topline"><span>#{item.rank}</span><code>{item.evidence_id.slice(0,10)}</code></div>
+              <div className="evidence-topline">
+                <span>#{item.rank}</span>
+                <code>{item.evidence_id.slice(0,10)}</code>
+              </div>
               <p>{item.text}</p>
-              <footer><span>{item.locator??"no locator"}</span><span>{item.method}</span></footer>
+              {item.evidence_kind === "visual" && item.visual_evidence_id && (
+                <button
+                  className="visual-open"
+                  onClick={() => onOpenVisual(item.visual_evidence_id)}
+                >
+                  View {item.modality || "visual"} region
+                </button>
+              )}
+              <footer>
+                <span>{item.locator??"no locator"}</span>
+                <span>{item.method}</span>
+              </footer>
             </article>
           )) : <div className="empty">Run a question to inspect selected evidence.</div>}
         </div>

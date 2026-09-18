@@ -10,6 +10,7 @@ import type {
   GraphSnapshot,
   LabComparison,
   SourceVersionSummary,
+  VisualEvidencePreview,
   WorkspaceOpenResult,
 } from "../../../../contracts/generated/rpc";
 import { engine } from "../contracts/client";
@@ -19,6 +20,7 @@ import { GraphView } from "../features/graph/GraphView";
 import { LabView } from "../features/lab/LabView";
 import { LibraryPanel } from "../features/library/LibraryPanel";
 import { TraceView } from "../features/trace/TraceView";
+import { VisualEvidenceViewer } from "../features/visual/VisualEvidenceViewer";
 
 type Tab = "ask" | "trace" | "graph" | "lab" | "attack";
 
@@ -39,6 +41,7 @@ export function App() {
   const [attackManifests, setAttackManifests] = useState<AttackManifestSummary[]>([]);
   const [attackRuns, setAttackRuns] = useState<AttackRunListItem[]>([]);
   const [attackResult, setAttackResult] = useState<AttackRunResult | null>(null);
+  const [visualPreview, setVisualPreview] = useState<VisualEvidencePreview | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Engine not contacted yet.");
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +86,7 @@ export function App() {
       setLabComparison(null);
       setLabExportPath(null);
       setAttackResult(null);
+      setVisualPreview(null);
       await Promise.all([refreshSources(), refreshLab(), refreshAttack()]);
       setStatus("Workspace open · " + opened.embedding_provider_id);
     } catch (reason) {
@@ -334,6 +338,19 @@ export function App() {
     );
   }
 
+  async function openVisualEvidence(visualEvidenceId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      setVisualPreview(await engine.visualEvidence(visualEvidenceId));
+      setStatus("Opened visual evidence · " + visualEvidenceId.slice(0, 10));
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   useEffect(() => {
     if (tab === "graph" && workspace && !graph && !busy) {
       void refreshGraph();
@@ -449,9 +466,15 @@ export function App() {
               onQuestion={setQuestion}
               onAsk={ask}
               onOpenTrace={() => setTab("trace")}
+              onOpenVisual={openVisualEvidence}
             />
           )}
-          {tab === "trace" && <TraceView result={result} />}
+          {tab === "trace" && (
+            <TraceView
+              result={result}
+              onOpenVisual={openVisualEvidence}
+            />
+          )}
           {tab === "graph" && (
             <GraphView
               graph={graph}
@@ -491,6 +514,12 @@ export function App() {
           )}
         </section>
       </div>
+      {visualPreview && (
+        <VisualEvidenceViewer
+          preview={visualPreview}
+          onClose={() => setVisualPreview(null)}
+        />
+      )}
     </main>
   );
 }
