@@ -32,6 +32,13 @@ from ..multimodal import (
     VisualEvidenceStore,
 )
 from ..pipeline import ask_evidence, index_document
+from ..provider_config import (
+    ProviderConfigStore,
+    ProviderSettings,
+    build_embedding_provider,
+    build_workspace_visual_provider,
+    provider_snapshot,
+)
 from ..recovery import inspect_workspace, repair_workspace
 from ..retrieval import (
     DeterministicHashEmbeddingProvider,
@@ -54,6 +61,8 @@ ALLOWED_METHODS = frozenset(
         "workspace.open",
         "workspace.health",
         "workspace.repair",
+        "providers.get",
+        "providers.set",
         "source.import",
         "source.list",
         "query.run",
@@ -130,7 +139,9 @@ class RpcService:
         self.embedding_provider = DeterministicHashEmbeddingProvider(
             dimensions=64
         )
-        self.visual_embedding_provider = _configured_visual_provider()
+        self.environment_visual_provider = _configured_visual_provider()
+        self.visual_embedding_provider = self.environment_visual_provider
+        self.provider_settings = ProviderSettings()
 
     def close(self) -> None:
         if self.vectors is not None:
@@ -155,6 +166,86 @@ class RpcService:
                 "Open a workspace before using this method.",
             )
         return self.lexical, self.vectors
+
+    def _provider_store(self) -> ProviderConfigStore:
+        lexical, _ = self._require_workspace()
+        return ProviderConfigStore(lexical)
+
+    def _apply_provider_settings(
+        self,
+        settings: ProviderSettings,
+    ) -> None:
+        self.provider_settings = settings
+        self.embedding_provider = build_embedding_provider(settings)
+        self.visual_embedding_provider = (
+            self.environment_visual_provider
+            or build_workspace_visual_provider(settings)
+        )
+
+    def _provider_snapshot(self) -> dict[str, Any]:
+        lexical, vectors = self._require_workspace()
+        settings = self._provider_store().load()
+        self._apply_provider_settings(settings)
+        dense_reindex_required = (
+            vectors.count(self.embedding_provider.provider_id)
+            < lexical.count()
+        )
+        visual_reindex_required = False
+        if (
+            self.visual_index is not None
+            and self.visual_embedding_provider is not None
+        ):
+            visual_reindex_required = (
+                self.visual_index.count(
+                    self.visual_embedding_provider.provider_id
+                )
+                < self.visual_index.store.evidence_count()
+            )
+        return provider_snapshot(
+            settings,
+            embedding_provider=self.embedding_provider,
+            visual_provider=self.visual_embedding_provider,
+            visual_config_source=(
+                "environment"
+                if self.environment_visual_provider is not None
+                else "workspace"
+            ),
+            dense_reindex_required=dense_reindex_required,
+            visual_reindex_required=visual_reindex_required,
+        )
+
+    def _providers_set(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        try:
+            settings = self._provider_store().save(
+                embedding_dimensions=int(
+                    params.get(
+                        "embedding_dimensions",
+                        self.provider_settings.embedding_dimensions,
+                    )
+                ),
+                visual_mode=str(
+                    params.get(
+                        "visual_mode",
+                        self.provider_settings.visual_mode,
+                    )
+                ),
+                visual_dimensions=int(
+                    params.get(
+                        "visual_dimensions",
+                        self.provider_settings.visual_dimensions,
+                    )
+                ),
+            )
+        except (TypeError, ValueError) as exc:
+            raise RpcServiceError(
+                "invalid_provider_config",
+                str(exc),
+            ) from exc
+        self._apply_provider_settings(settings)
+        return self._provider_snapshot()
 
     def _lab_store(self) -> EvalStore:
         lexical, _ = self._require_workspace()
@@ -193,6 +284,8 @@ class RpcService:
         LocalRunStore(self.lexical)
         EvalStore(self.lexical)
         AttackStore(self.lexical)
+        settings = ProviderConfigStore(self.lexical).load()
+        self._apply_provider_settings(settings)
         TaskStore(self.lexical).mark_interrupted()
         return {
             "path": str(path),
@@ -761,6 +854,10 @@ class RpcService:
             return self._workspace_health()
         if method == "workspace.repair":
             return self._workspace_repair()
+        if method == "providers.get":
+            return self._provider_snapshot()
+        if method == "providers.set":
+            return self._providers_set(params)
         if method == "source.import":
             return self._import_source(params)
         if method == "source.list":

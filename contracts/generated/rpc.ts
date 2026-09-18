@@ -9,6 +9,16 @@ export interface WorkspaceOpenResult { path:string; database:string; source_vers
 export interface WorkspaceHealthIssue { code:string; severity:"warning"|"error"; repairable:boolean; detail:string; }
 export interface WorkspaceHealthReport { status:"healthy"|"repairable"|"attention"; issues:WorkspaceHealthIssue[]; protected_state_fingerprint:string; counts:Record<string,number>; }
 export interface WorkspaceRepairResult { before:WorkspaceHealthReport; after:WorkspaceHealthReport; actions:string[]; protected_state_unchanged:boolean; }
+export interface ProviderSettings { embedding_dimensions:number; visual_mode:"off"|"hash"; visual_dimensions:number; updated_at:string; }
+export interface ProviderSnapshot {
+  settings:ProviderSettings;
+  embedding:{kind:string;provider_id:string;dimensions:number;config_source:string;reindex_required:boolean};
+  reranker:{kind:string;provider_id:string;config_source:string;editable:boolean};
+  generator:{kind:string;provider_id:string;config_source:string;editable:boolean};
+  visual:{kind:string;provider_id:string|null;dimensions:number|null;config_source:string;workspace_mode:"off"|"hash";workspace_dimensions:number;reindex_required:boolean};
+  secrets_persisted:false;
+  secret_policy:string;
+}
 export interface SourceVersionSummary { source_version_id:string; logical_source_id:string; source_path:string; title:string; media_type:string; valid_from:string; valid_to:string|null; supersedes_source_version_id:string|null; superseded_by_source_version_id:string|null; }
 export interface ContextEvidence { evidence_id:string; chunk_id:string; text:string; source_version_id:string; locator:string|null; method:string; rank:number; evidence_kind:string; visual_evidence_id:string; modality:string; }
 export interface Citation { evidence_id:string; chunk_id:string; source_version_id:string; locator:string|null; evidence_kind:string; visual_evidence_id:string; modality:string; }

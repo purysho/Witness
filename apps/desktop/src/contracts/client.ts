@@ -10,6 +10,7 @@ import {
   type EvalRunSummary,
   type GraphSnapshot,
   type LabCaseDetail,
+  type ProviderSnapshot,
   type LabComparison,
   type LabRunResult,
   type RpcEnvelope,
@@ -49,6 +50,18 @@ export const engine = {
     call<WorkspaceHealthReport>("workspace.health"),
   repairWorkspace: () =>
     call<WorkspaceRepairResult>("workspace.repair"),
+  providerSettings: () =>
+    call<ProviderSnapshot>("providers.get"),
+  setProviderSettings: (
+    embeddingDimensions: number,
+    visualMode: "off" | "hash",
+    visualDimensions: number,
+  ) =>
+    call<ProviderSnapshot>("providers.set", {
+      embedding_dimensions: embeddingDimensions,
+      visual_mode: visualMode,
+      visual_dimensions: visualDimensions,
+    }),
   importSource: (path: string, validFrom?: string, jobId?: string) =>
     call<Record<string, unknown>>("source.import", {
       path,

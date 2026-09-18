@@ -10,6 +10,7 @@ import type {
   EvalRunSummary,
   GraphSnapshot,
   LabComparison,
+  ProviderSnapshot,
   SourceVersionSummary,
   VisualEvidencePreview,
   WorkspaceHealthReport,
@@ -21,6 +22,7 @@ import { AttackView } from "../features/attack/AttackView";
 import { GraphView } from "../features/graph/GraphView";
 import { LabView } from "../features/lab/LabView";
 import { LibraryPanel } from "../features/library/LibraryPanel";
+import { ProviderPanel } from "../features/providers/ProviderPanel";
 import { TraceView } from "../features/trace/TraceView";
 import { VisualEvidenceViewer } from "../features/visual/VisualEvidenceViewer";
 
@@ -63,6 +65,7 @@ export function App() {
   const [workspace, setWorkspace] = useState<WorkspaceOpenResult | null>(null);
   const [workspaceHealth, setWorkspaceHealth] =
     useState<WorkspaceHealthReport | null>(null);
+  const [providers, setProviders] = useState<ProviderSnapshot | null>(null);
   const [sourcePath, setSourcePath] = useState("");
   const [validFrom, setValidFrom] = useState("");
   const [sources, setSources] = useState<SourceVersionSummary[]>([]);
@@ -100,6 +103,12 @@ export function App() {
     return report;
   }
 
+  async function refreshProviders() {
+    const snapshot = await engine.providerSettings();
+    setProviders(snapshot);
+    return snapshot;
+  }
+
 
   async function refreshLab() {
     const [datasets, runs] = await Promise.all([
@@ -132,6 +141,7 @@ export function App() {
       rememberWorkspace(opened.path);
       setWorkspace(opened);
       setWorkspaceHealth(null);
+      setProviders(null);
       setResult(null);
       setGraph(null);
       setLabComparison(null);
@@ -143,6 +153,7 @@ export function App() {
         refreshLab(),
         refreshAttack(),
         refreshWorkspaceHealth(),
+        refreshProviders(),
       ]);
       setStatus(
         "Workspace open · " +
@@ -216,7 +227,11 @@ export function App() {
         validFrom || undefined,
         jobId,
       );
-      await Promise.all([refreshSources(), refreshWorkspaceHealth()]);
+      await Promise.all([
+        refreshSources(),
+        refreshWorkspaceHealth(),
+        refreshProviders(),
+      ]);
       setSourcePath("");
       setStatus(
         "Source indexed into lexical, dense, temporal, hierarchy, graph, and visual projections.",
@@ -240,6 +255,7 @@ export function App() {
     try {
       const repaired = await engine.repairWorkspace();
       setWorkspaceHealth(repaired.after);
+      await refreshProviders();
       setStatus(
         repaired.actions.length
           ? "Workspace repaired · " + repaired.actions.join(" · ")
@@ -250,6 +266,36 @@ export function App() {
           "Repair changed protected workspace state; this should never occur.",
         );
       }
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function applyProviderSettings(
+    embeddingDimensions: number,
+    visualMode: "off" | "hash",
+    visualDimensions: number,
+  ) {
+    setBusy(true);
+    setError(null);
+    try {
+      const snapshot = await engine.setProviderSettings(
+        embeddingDimensions,
+        visualMode,
+        visualDimensions,
+      );
+      setProviders(snapshot);
+      const health = await refreshWorkspaceHealth();
+      const needsRepair =
+        snapshot.embedding.reindex_required ||
+        snapshot.visual.reindex_required;
+      setStatus(
+        needsRepair
+          ? "Provider settings applied · derived indexes need repair"
+          : "Provider settings applied · indexes current · health " + health.status,
+      );
     } catch (reason) {
       setError(String(reason));
     } finally {
@@ -716,6 +762,14 @@ export function App() {
               )}
             </div>
           </section>
+        )}
+
+        {workspace && providers && (
+          <ProviderPanel
+            snapshot={providers}
+            busy={busy}
+            onApply={applyProviderSettings}
+          />
         )}
 
         <LibraryPanel
