@@ -291,6 +291,11 @@ def aggregate_case_results(results: list[EvalCaseResult]) -> EvalRunMetrics:
     ]
     all_costs_available = bool(metrics) and len(known_costs) == len(metrics)
 
+    objective["mean_latency_ms"] = float(mean_latency)
+    objective["p95_latency_ms"] = float(p95)
+    if all_costs_available:
+        objective["total_cost_usd"] = float(sum(known_costs))
+
     return EvalRunMetrics(
         objective=objective,
         model_judged={},
