@@ -15,6 +15,10 @@ Current capabilities:
 - executable hierarchical retrieval that expands matched evidence through document structure;
 - executable claim/evidence graph retrieval with deterministic claim extraction and entity expansion;
 - provider-neutral reranking with deterministic and optional local cross-encoder implementations;
+- deterministic evidence reconciliation for duplicates, corroboration, contradictions, and temporal supersession;
+- explicit `SUFFICIENT`, `PARTIAL`, `CONFLICTED`, and `INSUFFICIENT` evidence states;
+- structured context packs, citation-ID validation, and a provider-neutral generation contract;
+- first complete Ask loop with sentence-level evidence IDs and persisted append-only Trace events;
 - serializable retrieval traces showing route reasons, specialized-route artifacts, RRF contributions, and pre/post-rerank positions.
 
 ## Specialized retrieval
@@ -82,3 +86,25 @@ with LocalEvidenceIndex("witness.sqlite3") as lexical, \
 For a compact exact lookup such as `What port is "auth-api"?`, the transparent router can execute lexical retrieval alone. Explanatory, relational, comparison, broad-summary, or temporal questions activate the relevant specialized routes. Trace records the exact route plan, temporal source selection, hierarchy expansion, claim/entity graph expansion, fusion contributions, and reranking movement.
 
 The exact vector scan is intentional at this stage. HNSW/ANN will be introduced as an optimization only after the Lab has a stable evaluation baseline that can quantify recall and latency changes.
+
+
+## Evidence reconciliation and Ask
+
+`ask_evidence(...)` is the first complete engine-side RAG loop. It performs routed retrieval, reconciles the selected evidence, decides an explicit sufficiency state, builds a structured context pack, generates a structured answer, validates every cited evidence ID, and persists the run as append-only trace events.
+
+The default generator is intentionally extractive and deterministic. It exists as a network-free reference implementation for CI and Lab, not as a claim of answer-writing quality. Richer generation providers must use the same context and validation contracts.
+
+A run records these stages:
+
+```text
+query.received
+retrieval.completed
+evidence.reconciled
+sufficiency.decided
+context.built
+generation.completed
+answer.validated
+run.completed
+```
+
+Trace payloads are structured artifacts such as route decisions, candidate lists, evidence relations, sufficiency features, context evidence IDs, and citation mappings. They do not contain hidden chain-of-thought.
