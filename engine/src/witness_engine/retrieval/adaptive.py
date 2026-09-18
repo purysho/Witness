@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 
+from ..multimodal.index import LocalVisualVectorIndex
+from ..multimodal.providers import VisualEmbeddingProvider
 from .embeddings import EmbeddingProvider
 from .graph import GraphTraceItem, LocalEvidenceGraph
 from .hierarchical import HierarchyTraceItem, LocalHierarchyIndex
@@ -27,6 +29,7 @@ class AdaptiveRetrievalTrace:
     plan: RetrievalPlan
     lexical_candidates: tuple[RetrievalCandidate, ...]
     dense_candidates: tuple[RetrievalCandidate, ...]
+    visual_candidates: tuple[RetrievalCandidate, ...]
     temporal_candidates: tuple[RetrievalCandidate, ...]
     hierarchical_candidates: tuple[RetrievalCandidate, ...]
     graph_candidates: tuple[RetrievalCandidate, ...]
@@ -38,6 +41,7 @@ class AdaptiveRetrievalTrace:
     rerank_trace: tuple[RerankTraceItem, ...]
     reranker_provider_id: str
     embedding_provider_id: str
+    visual_embedding_provider_id: str | None
     candidate_pool: int
     rerank_pool: int
     rrf_k: int
@@ -51,6 +55,15 @@ class AdaptiveRetrievalTrace:
 class AdaptiveRetrievalResult:
     candidates: tuple[RetrievalCandidate, ...]
     trace: AdaptiveRetrievalTrace
+
+
+def _should_run(plan: RetrievalPlan, route: str) -> bool:
+    """Allow older/fixed Lab routers to omit newer optional routes."""
+
+    try:
+        return plan.should_run(route)
+    except KeyError:
+        return False
 
 
 class RoutedRetriever:
@@ -67,15 +80,59 @@ class RoutedRetriever:
         temporal_index: LocalTemporalIndex | None = None,
         hierarchy_index: LocalHierarchyIndex | None = None,
         evidence_graph: LocalEvidenceGraph | None = None,
+        visual_index: LocalVisualVectorIndex | None = None,
+        visual_embedding_provider: VisualEmbeddingProvider | None = None,
     ) -> None:
+        if (visual_index is None) != (visual_embedding_provider is None):
+            raise ValueError(
+                "visual_index and visual_embedding_provider must be supplied together"
+            )
         self.lexical_index = lexical_index
         self.vector_index = vector_index
         self.embedding_provider = embedding_provider
-        self.router = router or TransparentRetrievalRouter()
+        self.visual_index = visual_index
+        self.visual_embedding_provider = visual_embedding_provider
+        self.router = router or TransparentRetrievalRouter(
+            visual_available=visual_index is not None
+            and visual_embedding_provider is not None
+        )
         self.reranker = reranker or DeterministicTokenReranker()
         self.temporal_index = temporal_index or LocalTemporalIndex(lexical_index)
         self.hierarchy_index = hierarchy_index or LocalHierarchyIndex(lexical_index)
         self.evidence_graph = evidence_graph or LocalEvidenceGraph(lexical_index)
+
+    def _visual_search(
+        self,
+        query: str,
+        *,
+        limit: int,
+    ) -> tuple[RetrievalCandidate, ...]:
+        if self.visual_index is None or self.visual_embedding_provider is None:
+            return ()
+        items = self.visual_index.search(
+            query,
+            self.visual_embedding_provider,
+            limit=limit,
+        )
+        return tuple(
+            RetrievalCandidate(
+                chunk_id=f"visual:{item.visual_evidence_id}",
+                text=(
+                    f"{item.modality.value}: {item.label_text.strip()}"
+                    if item.label_text.strip()
+                    else f"{item.modality.value} visual evidence at {item.locator}"
+                ),
+                score=item.score,
+                rank=item.rank,
+                method=item.method,
+                source_version_id=item.source_version_id,
+                locator=item.locator,
+                evidence_kind="visual",
+                visual_evidence_id=item.visual_evidence_id,
+                modality=item.modality.value,
+            )
+            for item in items
+        )
 
     def search(
         self,
@@ -94,6 +151,7 @@ class RoutedRetriever:
         plan = self.router.plan(query)
         lexical: tuple[RetrievalCandidate, ...] = ()
         dense: tuple[RetrievalCandidate, ...] = ()
+        visual: tuple[RetrievalCandidate, ...] = ()
         temporal: tuple[RetrievalCandidate, ...] = ()
         hierarchical: tuple[RetrievalCandidate, ...] = ()
         graph: tuple[RetrievalCandidate, ...] = ()
@@ -101,9 +159,9 @@ class RoutedRetriever:
         hierarchy_trace: tuple[HierarchyTraceItem, ...] = ()
         graph_trace: tuple[GraphTraceItem, ...] = ()
 
-        if plan.should_run("lexical"):
+        if _should_run(plan, "lexical"):
             lexical = tuple(self.lexical_index.search(query, limit=candidate_pool))
-        if plan.should_run("dense"):
+        if _should_run(plan, "dense"):
             dense = tuple(
                 self.vector_index.search(
                     query,
@@ -111,11 +169,13 @@ class RoutedRetriever:
                     limit=candidate_pool,
                 )
             )
-        if plan.should_run("temporal"):
+        if _should_run(plan, "visual"):
+            visual = self._visual_search(query, limit=candidate_pool)
+        if _should_run(plan, "temporal"):
             temporal_result = self.temporal_index.search(query, limit=candidate_pool)
             temporal = temporal_result.candidates
             temporal_selection = temporal_result.selection
-        if plan.should_run("hierarchical"):
+        if _should_run(plan, "hierarchical"):
             hierarchical_result = self.hierarchy_index.search(
                 query,
                 limit=candidate_pool,
@@ -123,7 +183,7 @@ class RoutedRetriever:
             )
             hierarchical = hierarchical_result.candidates
             hierarchy_trace = hierarchical_result.trace
-        if plan.should_run("graph"):
+        if _should_run(plan, "graph"):
             graph_result = self.evidence_graph.search(
                 query,
                 limit=candidate_pool,
@@ -134,7 +194,14 @@ class RoutedRetriever:
 
         active_routes = tuple(
             route
-            for route in (lexical, dense, temporal, hierarchical, graph)
+            for route in (
+                lexical,
+                dense,
+                visual,
+                temporal,
+                hierarchical,
+                graph,
+            )
             if route
         )
 
@@ -165,6 +232,7 @@ class RoutedRetriever:
                 plan=plan,
                 lexical_candidates=lexical,
                 dense_candidates=dense,
+                visual_candidates=visual,
                 temporal_candidates=temporal,
                 hierarchical_candidates=hierarchical,
                 graph_candidates=graph,
@@ -176,6 +244,11 @@ class RoutedRetriever:
                 rerank_trace=reranked.trace,
                 reranker_provider_id=reranked.provider_id,
                 embedding_provider_id=self.embedding_provider.provider_id,
+                visual_embedding_provider_id=(
+                    self.visual_embedding_provider.provider_id
+                    if self.visual_embedding_provider is not None
+                    else None
+                ),
                 candidate_pool=candidate_pool,
                 rerank_pool=rerank_pool,
                 rrf_k=rrf_k,

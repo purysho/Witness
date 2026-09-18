@@ -224,11 +224,14 @@ class RpcService:
             max(int(params.get("limit", 10)), 1),
             50,
         )
+        assert self.visual_index is not None
         return ask_evidence(
             question,
             lexical,
             vectors,
             self.embedding_provider,
+            visual_index=self.visual_index,
+            visual_embedding_provider=self.visual_embedding_provider,
             limit=limit,
             candidate_pool=max(30, limit),
             rerank_pool=max(20, limit),

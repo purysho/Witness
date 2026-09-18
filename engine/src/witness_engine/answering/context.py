@@ -19,6 +19,9 @@ class ContextEvidence:
     locator: str | None
     method: str
     rank: int
+    evidence_kind: str = "text"
+    visual_evidence_id: str = ""
+    modality: str = ""
 
 
 @dataclass(frozen=True)
@@ -53,6 +56,7 @@ def build_context_pack(
         ContextEvidence(
             evidence_id=stable_id(
                 "evidence",
+                candidate.evidence_kind,
                 candidate.source_version_id or "",
                 candidate.chunk_id,
                 candidate.locator or "",
@@ -63,6 +67,9 @@ def build_context_pack(
             locator=candidate.locator,
             method=candidate.method,
             rank=candidate.rank,
+            evidence_kind=candidate.evidence_kind,
+            visual_evidence_id=candidate.visual_evidence_id,
+            modality=candidate.modality,
         )
         for candidate in candidates
     )

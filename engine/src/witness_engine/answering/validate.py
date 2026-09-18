@@ -86,6 +86,9 @@ def validate_generation(
             chunk_id=evidence[evidence_id].chunk_id,
             source_version_id=evidence[evidence_id].source_version_id,
             locator=evidence[evidence_id].locator,
+            evidence_kind=evidence[evidence_id].evidence_kind,
+            visual_evidence_id=evidence[evidence_id].visual_evidence_id,
+            modality=evidence[evidence_id].modality,
         )
         for evidence_id in used_ids
     )
