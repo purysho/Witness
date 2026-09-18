@@ -57,7 +57,7 @@ impl EngineClient {
             }
             let response:Value=serde_json::from_str(&line)
                 .map_err(|error| format!("Witness engine returned invalid JSON: {error}"))?;
-            if response.get("id").and_then(Value::as_str)==Some(&request_id) {
+            if response.get("id").and_then(Value::as_str)==Some(request_id.as_str()) {
                 return Ok(response);
             }
         }
