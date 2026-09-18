@@ -39,3 +39,11 @@ select:focus{border-color:var(--gold-soft)}
 .lab-snapshot,.lab-export-path{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);display:grid;gap:6px}.lab-snapshot strong,.lab-export-path span{font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--gold)}
 .lab-snapshot span{color:var(--muted);font-size:9px}.lab-export-path code{font-size:9px;color:var(--muted);word-break:break-all}.lab-empty{min-height:160px}
 @media(max-width:1280px){.lab-layout{grid-template-columns:1fr}.lab-sidebar{position:static}.lab-config-grid{grid-template-columns:1fr 1fr}.lab-shared{grid-column:1/-1}.metric-head,.metric-row{grid-template-columns:minmax(160px,1fr) 90px 90px 100px}}
+
+.lab-run-list article.history-selected{border-color:var(--gold-soft)}
+.history-buttons{grid-column:1/-1;display:flex!important;gap:5px!important}
+.history-buttons button{border:1px solid var(--line);background:#121313;color:var(--muted);border-radius:5px;padding:4px 8px;font-size:9px}
+.history-buttons button.history-active{border-color:var(--gold-soft);color:var(--gold);background:#1b160d}
+.lab-history-compare{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.lab-history-compare span{color:var(--muted);font-size:9px;font-family:"SFMono-Regular",Consolas,monospace}
+.lab-history-compare button{grid-column:1/-1}
