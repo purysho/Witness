@@ -144,3 +144,205 @@ def test_rag_lab_measures_visual_gold_evidence_against_text_baseline(tmp_path):
                 event["stage"] == "retrieval.visual.completed"
                 for event in routed_case.ask_result["trace"]
             )
+
+
+
+def test_routed_lab_cites_visual_region_alongside_text_evidence(tmp_path):
+    source = tmp_path / "mixed-report.md"
+    source.write_text(
+        "# Quarterly report\n\n"
+        "The analyst notes say margins remained stable.\n",
+        encoding="utf-8",
+    )
+    database = tmp_path / "mixed-witness.sqlite3"
+    text_provider = DeterministicHashEmbeddingProvider(dimensions=8)
+    visual_provider = AlignedVisualProvider()
+
+    with LocalEvidenceIndex(database) as lexical:
+        with LocalVectorIndex(database) as vectors:
+            indexed = index_document(
+                source,
+                lexical,
+                vector_index=vectors,
+                embedding_provider=text_provider,
+            )
+            text_row = lexical.connection.execute(
+                """
+                SELECT chunk_id
+                FROM indexed_chunks
+                WHERE source_version_id = ?
+                ORDER BY start_offset, chunk_id
+                LIMIT 1
+                """,
+                (indexed.source_version_id,),
+            ).fetchone()
+            assert text_row is not None
+
+            visual_store = VisualEvidenceStore(lexical)
+            visual = visual_store.register(
+                source_version_id=indexed.source_version_id,
+                modality=VisualModality.CHART,
+                page_number=2,
+                region=NormalizedRegion(
+                    x0=0.08,
+                    y0=0.12,
+                    x1=0.92,
+                    y1=0.82,
+                ),
+                payload=b"mixed-quarterly-revenue-chart",
+                media_type="image/png",
+                label_text=(
+                    "Quarterly revenue chart shows 42 percent growth."
+                ),
+            )
+            visual_index = LocalVisualVectorIndex(lexical)
+            assert visual_index.sync(visual_provider) == 1
+
+            dataset = EvalDataset(
+                dataset_id="mixed-multimodal-smoke",
+                name="Mixed multimodal smoke",
+                cases=(
+                    EvalCase(
+                        case_id="mixed-evidence",
+                        question=(
+                            "What does the revenue chart show and what do "
+                            "the analyst notes say?"
+                        ),
+                        gold_evidence=(
+                            GoldEvidenceRef(
+                                chunk_id=text_row["chunk_id"],
+                            ),
+                            GoldEvidenceRef(
+                                visual_evidence_id=visual.visual_evidence_id,
+                            ),
+                        ),
+                        expected_state=SufficiencyState.SUFFICIENT,
+                        expected_answer_contains=(
+                            "margins remained stable",
+                            "42 percent",
+                        ),
+                        tags=("multimodal", "mixed-evidence"),
+                    ),
+                ),
+            )
+
+            result = EvalRunner(
+                lexical,
+                vectors,
+                text_provider,
+                visual_index=visual_index,
+                visual_embedding_provider=visual_provider,
+            ).run(
+                dataset,
+                EvalConfig(
+                    name="Routed mixed evidence",
+                    retrieval_mode=RetrievalMode.ROUTED,
+                    top_k=2,
+                ),
+            )
+
+            case = result.cases[0]
+            assert case.metrics.recall_at_k == 1.0
+            assert case.metrics.citation_precision == 1.0
+            assert case.metrics.citation_coverage == 1.0
+            assert case.metrics.passed is True
+            assert case.ask_result is not None
+
+            context = case.ask_result["context"]["evidence"]
+            assert {item["evidence_kind"] for item in context} == {
+                "text",
+                "visual",
+            }
+            citations = case.ask_result["answer"]["citations"]
+            assert {item["evidence_kind"] for item in citations} == {
+                "text",
+                "visual",
+            }
+            assert any(
+                item["visual_evidence_id"] == visual.visual_evidence_id
+                for item in citations
+            )
+            visual_event = next(
+                event
+                for event in case.ask_result["trace"]
+                if event["stage"] == "retrieval.visual.completed"
+            )
+            assert visual_event["payload"]["candidates"]
+
+
+
+def test_routed_lab_scores_table_visual_gold_evidence(tmp_path):
+    source = tmp_path / "table-report.md"
+    source.write_text(
+        "# Table report\n\nSupporting notes.\n",
+        encoding="utf-8",
+    )
+    database = tmp_path / "table-witness.sqlite3"
+    text_provider = DeterministicHashEmbeddingProvider(dimensions=8)
+    visual_provider = AlignedVisualProvider()
+
+    with LocalEvidenceIndex(database) as lexical:
+        with LocalVectorIndex(database) as vectors:
+            indexed = index_document(
+                source,
+                lexical,
+                vector_index=vectors,
+                embedding_provider=text_provider,
+            )
+            visual = VisualEvidenceStore(lexical).register(
+                source_version_id=indexed.source_version_id,
+                modality=VisualModality.TABLE,
+                page_number=3,
+                region=NormalizedRegion(
+                    x0=0.12,
+                    y0=0.18,
+                    x1=0.88,
+                    y1=0.78,
+                ),
+                payload=b"regional-margin-table",
+                media_type="image/png",
+                label_text="Regional margin table lists North at 18 percent.",
+            )
+            visual_index = LocalVisualVectorIndex(lexical)
+            assert visual_index.sync(visual_provider) == 1
+
+            dataset = EvalDataset(
+                dataset_id="multimodal-table-smoke",
+                name="Multimodal table smoke",
+                cases=(
+                    EvalCase(
+                        case_id="margin-table",
+                        question="What does the regional margin table list?",
+                        gold_evidence=(
+                            GoldEvidenceRef(
+                                visual_evidence_id=visual.visual_evidence_id,
+                            ),
+                        ),
+                        expected_state=SufficiencyState.SUFFICIENT,
+                        expected_answer_contains=("18 percent",),
+                        tags=("multimodal", "table"),
+                    ),
+                ),
+            )
+
+            result = EvalRunner(
+                lexical,
+                vectors,
+                text_provider,
+                visual_index=visual_index,
+                visual_embedding_provider=visual_provider,
+            ).run(
+                dataset,
+                EvalConfig(
+                    name="Routed table evidence",
+                    retrieval_mode=RetrievalMode.ROUTED,
+                    top_k=1,
+                ),
+            )
+
+            case = result.cases[0]
+            assert case.metrics.recall_at_k == 1.0
+            assert case.metrics.citation_coverage == 1.0
+            assert case.metrics.passed is True
+            assert case.ask_result is not None
+            assert case.ask_result["answer"]["citations"][0]["modality"] == "table"
