@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import base64
 from dataclasses import asdict
 from datetime import datetime
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
+from PIL import Image
 from pydantic import ValidationError
 
 from ..attack import AttackManifest, AttackRunner, AttackStore, export_attack_run
@@ -23,6 +26,7 @@ from ..graph.view import build_graph_snapshot
 from ..multimodal import (
     DeterministicHashVisualEmbeddingProvider,
     LocalVisualVectorIndex,
+    VisualEvidenceStore,
 )
 from ..pipeline import ask_evidence, index_document
 from ..retrieval import (
@@ -57,6 +61,7 @@ ALLOWED_METHODS = frozenset(
         "attack.runs",
         "attack.run.get",
         "attack.export",
+        "visual.evidence.get",
     }
 )
 
@@ -452,6 +457,60 @@ class RpcService:
             ) from exc
         return result.model_dump(mode="json")
 
+    def _visual_evidence_get(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        lexical, _ = self._require_workspace()
+        visual_evidence_id = str(
+            params.get("visual_evidence_id", "")
+        ).strip()
+        if not visual_evidence_id:
+            raise RpcServiceError(
+                "invalid_params",
+                "visual.evidence.get requires visual_evidence_id",
+            )
+        store = VisualEvidenceStore(lexical)
+        try:
+            evidence = store.load(visual_evidence_id)
+            payload = store.asset_bytes(evidence.asset_sha256)
+        except KeyError as exc:
+            raise RpcServiceError(
+                "visual_evidence_not_found",
+                str(exc),
+            ) from exc
+
+        preview_data_url: str | None = None
+        preview_warning: str | None = None
+        try:
+            with Image.open(BytesIO(payload)) as image:
+                preview = image.convert("RGB")
+                preview.thumbnail((640, 640))
+                buffer = BytesIO()
+                preview.save(
+                    buffer,
+                    format="JPEG",
+                    quality=78,
+                    optimize=True,
+                )
+                encoded = base64.b64encode(
+                    buffer.getvalue()
+                ).decode("ascii")
+                preview_data_url = (
+                    "data:image/jpeg;base64," + encoded
+                )
+        except Exception as exc:
+            preview_warning = (
+                "Preview unavailable: "
+                f"{type(exc).__name__}: {exc}"
+            )
+
+        return {
+            "evidence": evidence.model_dump(mode="json"),
+            "preview_data_url": preview_data_url,
+            "preview_warning": preview_warning,
+        }
+
     def handle(
         self,
         method: str,
@@ -648,5 +707,7 @@ class RpcService:
                     str(exc),
                 ) from exc
             return {"path": str(path), "format": format_value}
+        if method == "visual.evidence.get":
+            return self._visual_evidence_get(params)
 
         raise AssertionError(method)

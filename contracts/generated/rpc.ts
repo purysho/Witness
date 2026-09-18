@@ -37,6 +37,10 @@ export interface LabMetricComparison { metric:string; a:number|null; b:number|nu
 export interface LabCaseComparison { case_id:string; question:string; a_passed:boolean; b_passed:boolean; a_state:SufficiencyState|null; b_state:SufficiencyState|null; a_query_run_id:string|null; b_query_run_id:string|null; a_failures:string[]; b_failures:string[]; }
 export interface LabComparison { dataset_fingerprint:string; dataset_id:string; dataset_name:string; run_a:EvalRunSummary; run_b:EvalRunSummary; metrics:LabMetricComparison[]; model_judged_metrics:Array<Record<string,unknown>>; cases:LabCaseComparison[]; failed_cases:LabCaseComparison[]; }
 
+export interface VisualRegion { x0:number; y0:number; x1:number; y1:number; }
+export interface VisualEvidenceDetail { visual_evidence_id:string; source_version_id:string; modality:"image"|"figure"|"chart"|"table"|"page_region"; page_number:number; region:VisualRegion; locator:string; asset_sha256:string; media_type:string; width_px:number|null; height_px:number|null; label_text:string; }
+export interface VisualEvidencePreview { evidence:VisualEvidenceDetail; preview_data_url:string|null; preview_warning:string|null; }
+
 export interface AttackManifestSummary { manifest_fingerprint:string; attack_id:string; name:string; description:string; mutation_count:number; registered_at?:string; }
 export interface AttackInvariantResult { invariant_id:string; kind:string; status:"PASS"|"FAIL"|"NOT_APPLICABLE"; case_id:string|null; detail:string; }
 export interface AttackCaseComparison { case_id:string; question:string; clean_state:SufficiencyState|null; attacked_state:SufficiencyState|null; clean_passed:boolean; attacked_passed:boolean; clean_query_run_id:string|null; attacked_query_run_id:string|null; recall_delta:number|null; precision_delta:number|null; citation_coverage_delta:number|null; added_evidence_count:number; removed_evidence_count:number; rank_changed_count:number; clean_answer_text:string; attacked_answer_text:string; }
