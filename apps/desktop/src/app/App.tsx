@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type {
   AskResult,
   AttackManifestSummary,
@@ -24,9 +25,28 @@ import { VisualEvidenceViewer } from "../features/visual/VisualEvidenceViewer";
 
 type Tab = "ask" | "trace" | "graph" | "lab" | "attack";
 
+const LAST_WORKSPACE_KEY = "witness:last-workspace";
+
+function rememberedWorkspace(): string {
+  try {
+    return window.localStorage.getItem(LAST_WORKSPACE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberWorkspace(path: string) {
+  try {
+    window.localStorage.setItem(LAST_WORKSPACE_KEY, path);
+  } catch {
+    // A remembered path is a convenience only; workspace state stays canonical
+    // in the engine and must not depend on browser storage.
+  }
+}
+
 export function App() {
   const [tab, setTab] = useState<Tab>("ask");
-  const [workspacePath, setWorkspacePath] = useState("");
+  const [workspacePath, setWorkspacePath] = useState(rememberedWorkspace);
   const [workspace, setWorkspace] = useState<WorkspaceOpenResult | null>(null);
   const [sourcePath, setSourcePath] = useState("");
   const [validFrom, setValidFrom] = useState("");
@@ -75,11 +95,17 @@ export function App() {
     setAttackRuns(runs.runs);
   }
 
-  async function openWorkspace() {
+  async function openWorkspacePath(path: string) {
+    const normalized = path.trim();
+    if (!normalized) {
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const opened = await engine.openWorkspace(workspacePath);
+      const opened = await engine.openWorkspace(normalized);
+      setWorkspacePath(opened.path);
+      rememberWorkspace(opened.path);
       setWorkspace(opened);
       setResult(null);
       setGraph(null);
@@ -93,6 +119,54 @@ export function App() {
       setError(String(reason));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function openWorkspace() {
+    await openWorkspacePath(workspacePath);
+  }
+
+  async function browseWorkspace() {
+    setError(null);
+    try {
+      const selected = await openDialog({
+        directory: true,
+        multiple: false,
+        title: "Choose a Witness workspace folder",
+      });
+      if (typeof selected === "string") {
+        setWorkspacePath(selected);
+        await openWorkspacePath(selected);
+      }
+    } catch (reason) {
+      setError("Could not open workspace picker: " + String(reason));
+    }
+  }
+
+  async function browseSource() {
+    setError(null);
+    try {
+      const selected = await openDialog({
+        directory: false,
+        multiple: false,
+        title: "Choose an evidence source",
+        filters: [
+          {
+            name: "Evidence files",
+            extensions: [
+              "pdf", "md", "markdown", "txt", "html", "htm",
+              "docx", "pptx", "xlsx", "csv", "json", "py", "js",
+              "ts", "tsx", "jsx", "rs", "go", "java", "c", "cpp",
+              "h", "hpp", "toml", "yaml", "yml",
+            ],
+          },
+        ],
+      });
+      if (typeof selected === "string") {
+        setSourcePath(selected);
+      }
+    } catch (reason) {
+      setError("Could not open source picker: " + String(reason));
     }
   }
 
@@ -420,13 +494,22 @@ export function App() {
               placeholder="C:\Witness\Research.witness"
             />
           </label>
-          <button
-            className="secondary"
-            disabled={busy || !workspacePath.trim()}
-            onClick={openWorkspace}
-          >
-            {workspace ? "Reopen" : "Open workspace"}
-          </button>
+          <div className="workspace-actions">
+            <button
+              className="secondary"
+              disabled={busy}
+              onClick={browseWorkspace}
+            >
+              Browse
+            </button>
+            <button
+              className="secondary"
+              disabled={busy || !workspacePath.trim()}
+              onClick={openWorkspace}
+            >
+              {workspace ? "Reopen" : "Open workspace"}
+            </button>
+          </div>
           <div className="engine-status">
             <span className={workspace ? "status-dot ready" : "status-dot"} />
             <div>
@@ -446,13 +529,48 @@ export function App() {
           </div>
         )}
 
+        {!workspace && (
+          <section className="panel first-run-panel">
+            <div>
+              <span className="eyebrow">FIRST RUN</span>
+              <h2>Start with a local evidence workspace</h2>
+              <p>
+                Choose a folder for Witness. Your source versions, indexes,
+                traces, Lab runs, and attack artifacts stay inside that local
+                workspace.
+              </p>
+            </div>
+            <ol className="first-run-steps">
+              <li><strong>01</strong><span>Choose or create a workspace folder.</span></li>
+              <li><strong>02</strong><span>Add a local evidence file from Library.</span></li>
+              <li><strong>03</strong><span>Ask a question, then inspect its Trace.</span></li>
+            </ol>
+            <div className="first-run-actions">
+              <button className="primary" disabled={busy} onClick={browseWorkspace}>
+                Choose workspace
+              </button>
+              {workspacePath.trim() && (
+                <button
+                  className="secondary"
+                  disabled={busy}
+                  onClick={openWorkspace}
+                >
+                  Open remembered workspace
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
         <LibraryPanel
           sourcePath={sourcePath}
           validFrom={validFrom}
           sources={sources}
           busy={busy}
+          workspaceReady={Boolean(workspace)}
           onSourcePath={setSourcePath}
           onValidFrom={setValidFrom}
+          onBrowseSource={browseSource}
           onImport={importSource}
         />
 
