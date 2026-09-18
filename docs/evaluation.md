@@ -15,7 +15,7 @@ Each case may define:
 - optional answer text fragments;
 - optional tags.
 
-Gold evidence selectors may use chunk ID, source-version ID, source locator, source path, or a conjunction of those fields. Source paths may be full paths or suffixes such as docs/architecture.md. A case with no gold evidence is useful for abstention tests.
+Gold evidence selectors may use chunk ID, visual-evidence ID, source-version ID, source locator, source path, or a conjunction of those fields. Visual-evidence IDs are the strongest selector for multimodal cases; source-version + page-region locator is useful for portable fixtures. Source paths may be full paths or suffixes such as docs/architecture.md. A case with no gold evidence is useful for abstention tests.
 
 Datasets are stored by a content-addressed fingerprint. Registering edited content creates a new immutable dataset snapshot rather than silently changing historical Lab runs.
 
@@ -35,7 +35,7 @@ Every run persists:
 - generation provider identity;
 - corpus fingerprint.
 
-The corpus fingerprint is calculated from the ordered immutable chunk/source/locator projection. A run therefore records both the benchmark snapshot and the evidence snapshot it evaluated.
+The corpus fingerprint is calculated from the ordered immutable text chunk/source/locator projection and, when present, the ordered visual-evidence/source/modality/locator/asset-hash projection. A run therefore records both the benchmark snapshot and the full text/visual evidence snapshot it evaluated. Routed multimodal runs additionally record the visual embedding provider identity; fixed lexical, dense, and hybrid baselines remain text-only.
 
 ## Objective metrics
 
@@ -73,3 +73,12 @@ A/B comparison requires the same dataset fingerprint. It reports metric A, metri
 Completed runs can be exported as JSON or CSV. Default desktop exports are written under the workspace exports directory.
 
 JSON preserves the run configuration, aggregate metrics, per-case metrics, and Ask results. CSV is a flat case-level metric export suitable for external analysis.
+
+
+## Multimodal Lab cases
+
+Phase 7 extends the existing objective metrics rather than defining a separate visual scorecard. A gold reference may identify an immutable visual region by `visual_evidence_id` or by the same conjunctive source-version / source-path / locator selectors used for text.
+
+The fixed lexical, dense, and hybrid modes remain Phase 5 text baselines. Routed mode may execute the visual route when the query contains an explicit visual signal and the workspace has a visual index/provider. Visual candidates then use the same Recall@K, Precision@K, MRR, nDCG, citation precision, and citation coverage calculations because their provenance is represented in the shared retrieval-candidate contract.
+
+This makes a useful regression experiment possible: run the same visual benchmark once with a fixed text-only baseline and once with routed multimodal retrieval, then inspect the metric delta and both traces.

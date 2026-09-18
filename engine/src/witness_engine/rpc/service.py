@@ -326,11 +326,14 @@ class RpcService:
             config = EvalConfig.model_validate(
                 params.get("config", {})
             )
+            assert self.visual_index is not None
             result = EvalRunner(
                 lexical,
                 vectors,
                 self.embedding_provider,
                 store=store,
+                visual_index=self.visual_index,
+                visual_embedding_provider=self.visual_embedding_provider,
             ).run(
                 dataset,
                 config,

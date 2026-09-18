@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "dataset_id": "witness-multimodal-example-v1",
+  "name": "Witness multimodal example benchmark",
+  "description": "Example Phase 7 dataset. Replace the source path and normalized page-region locator with values from visual evidence in your workspace.",
+  "cases": [
+    {
+      "case_id": "revenue-chart-region",
+      "question": "What does the revenue chart show?",
+      "gold_evidence": [
+        {
+          "source_path": "quarterly-report.pdf",
+          "locator": "page:2#region:0.100000,0.150000,0.900000,0.800000"
+        }
+      ],
+      "expected_state": "SUFFICIENT",
+      "tags": [
+        "multimodal",
+        "chart",
+        "visual-retrieval"
+      ]
+    }
+  ]
+}

@@ -25,6 +25,7 @@ class GoldEvidenceRef(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     chunk_id: str | None = None
+    visual_evidence_id: str | None = None
     source_version_id: str | None = None
     locator: str | None = None
     source_path: str | None = None
@@ -34,6 +35,7 @@ class GoldEvidenceRef(BaseModel):
         if not any(
             (
                 self.chunk_id,
+                self.visual_evidence_id,
                 self.source_version_id,
                 self.locator,
                 self.source_path,
@@ -102,6 +104,7 @@ class EvalConfig(BaseModel):
         reranker_provider_id: str,
         generator_provider_id: str,
         corpus_fingerprint: str,
+        visual_embedding_provider_id: str | None = None,
     ) -> "EvalConfigSnapshot":
         payload = {
             **self.model_dump(mode="json"),
@@ -110,6 +113,10 @@ class EvalConfig(BaseModel):
             "generator_provider_id": generator_provider_id,
             "corpus_fingerprint": corpus_fingerprint,
         }
+        if visual_embedding_provider_id is not None:
+            payload["visual_embedding_provider_id"] = (
+                visual_embedding_provider_id
+            )
         canonical = json.dumps(
             payload,
             sort_keys=True,
@@ -122,6 +129,7 @@ class EvalConfig(BaseModel):
             embedding_provider_id=embedding_provider_id,
             reranker_provider_id=reranker_provider_id,
             generator_provider_id=generator_provider_id,
+            visual_embedding_provider_id=visual_embedding_provider_id,
             **self.model_dump(),
         )
 
@@ -142,6 +150,7 @@ class EvalConfigSnapshot(BaseModel):
     embedding_provider_id: str
     reranker_provider_id: str
     generator_provider_id: str
+    visual_embedding_provider_id: str | None = None
 
 
 class EvalCaseMetrics(BaseModel):
