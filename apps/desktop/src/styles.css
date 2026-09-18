@@ -104,3 +104,9 @@ select:focus{border-color:var(--gold-soft)}
 .first-run-steps{list-style:none;margin:0;padding:0;display:grid;gap:8px}.first-run-steps li{display:grid;grid-template-columns:28px 1fr;gap:8px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}.first-run-steps strong{color:var(--gold);font-size:9px;letter-spacing:.12em}.first-run-steps span{color:#c9c6bd;font-size:10px}
 .first-run-actions{display:grid;gap:7px}.library-locked{margin-top:14px;border-top:1px solid var(--line)}
 @media(max-width:1280px){.first-run-panel{grid-template-columns:1fr 1fr}.first-run-actions{grid-column:1/-1;grid-template-columns:max-content max-content}}
+
+
+.workspace-health-panel{margin-bottom:14px;padding:11px 13px;border:1px solid var(--line);border-radius:9px;background:#101111;display:flex;justify-content:space-between;gap:18px;align-items:center}
+.workspace-health-panel>div:first-child{display:grid;grid-template-columns:auto auto;gap:3px 10px;align-items:baseline}
+.workspace-health-panel span{color:var(--muted);font-size:9px;letter-spacing:.14em}.workspace-health-panel strong{font-size:10px;letter-spacing:.1em}.workspace-health-panel small{grid-column:1/-1;color:var(--muted);font-size:10px;line-height:1.45}
+.workspace-health-actions{display:flex;gap:7px}.health-healthy{border-color:rgba(185,154,91,.22)}.health-healthy strong{color:#b9b491}.health-repairable{border-color:var(--gold-soft);background:#17140d}.health-repairable strong{color:var(--gold)}.health-attention{border-color:#6b403a;background:#21110f}.health-attention strong{color:#c9877e}

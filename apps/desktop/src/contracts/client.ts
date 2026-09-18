@@ -16,7 +16,9 @@ import {
   type RpcRequest,
   type SourceVersionSummary,
   type VisualEvidencePreview,
+  type WorkspaceHealthReport,
   type WorkspaceOpenResult,
+  type WorkspaceRepairResult,
 } from "../../../../contracts/generated/rpc";
 
 let sequence = 0;
@@ -43,6 +45,10 @@ export const engine = {
   ping: () => call<{ ok: boolean; protocol_version: number }>("ping"),
   openWorkspace: (path: string) =>
     call<WorkspaceOpenResult>("workspace.open", { path }),
+  workspaceHealth: () =>
+    call<WorkspaceHealthReport>("workspace.health"),
+  repairWorkspace: () =>
+    call<WorkspaceRepairResult>("workspace.repair"),
   importSource: (path: string, validFrom?: string) =>
     call<Record<string, unknown>>("source.import", {
       path,

@@ -32,6 +32,7 @@ from ..multimodal import (
     VisualEvidenceStore,
 )
 from ..pipeline import ask_evidence, index_document
+from ..recovery import inspect_workspace, repair_workspace
 from ..retrieval import (
     DeterministicHashEmbeddingProvider,
     LocalEvidenceGraph,
@@ -45,6 +46,8 @@ ALLOWED_METHODS = frozenset(
     {
         "ping",
         "workspace.open",
+        "workspace.health",
+        "workspace.repair",
         "source.import",
         "source.list",
         "query.run",
@@ -195,6 +198,26 @@ class RpcService:
                 else None
             ),
         }
+
+    def _workspace_health(self) -> dict[str, Any]:
+        lexical, vectors = self._require_workspace()
+        return inspect_workspace(
+            lexical,
+            vectors,
+            self.embedding_provider,
+            visual_index=self.visual_index,
+            visual_embedding_provider=self.visual_embedding_provider,
+        ).to_dict()
+
+    def _workspace_repair(self) -> dict[str, Any]:
+        lexical, vectors = self._require_workspace()
+        return repair_workspace(
+            lexical,
+            vectors,
+            self.embedding_provider,
+            visual_index=self.visual_index,
+            visual_embedding_provider=self.visual_embedding_provider,
+        ).to_dict()
 
     def _source_rows(self) -> list[dict[str, Any]]:
         lexical, _ = self._require_workspace()
@@ -573,6 +596,10 @@ class RpcService:
             }
         if method == "workspace.open":
             return self._open_workspace(params)
+        if method == "workspace.health":
+            return self._workspace_health()
+        if method == "workspace.repair":
+            return self._workspace_repair()
         if method == "source.import":
             return self._import_source(params)
         if method == "source.list":

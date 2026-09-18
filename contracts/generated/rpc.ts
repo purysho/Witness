@@ -6,6 +6,9 @@ export interface RpcRequest { v:1; id:string; method:string; params:Record<strin
 export interface RpcError { code:string; message:string; details?:Record<string,unknown>|null; }
 export type RpcEnvelope<T> = {v:1;id:string;type:"result";result:T}|{v:1;id:string;type:"error";error:RpcError};
 export interface WorkspaceOpenResult { path:string; database:string; source_versions:number; embedding_provider_id:string; visual_embedding_provider_id:string|null; }
+export interface WorkspaceHealthIssue { code:string; severity:"warning"|"error"; repairable:boolean; detail:string; }
+export interface WorkspaceHealthReport { status:"healthy"|"repairable"|"attention"; issues:WorkspaceHealthIssue[]; protected_state_fingerprint:string; counts:Record<string,number>; }
+export interface WorkspaceRepairResult { before:WorkspaceHealthReport; after:WorkspaceHealthReport; actions:string[]; protected_state_unchanged:boolean; }
 export interface SourceVersionSummary { source_version_id:string; logical_source_id:string; source_path:string; title:string; media_type:string; valid_from:string; valid_to:string|null; supersedes_source_version_id:string|null; superseded_by_source_version_id:string|null; }
 export interface ContextEvidence { evidence_id:string; chunk_id:string; text:string; source_version_id:string; locator:string|null; method:string; rank:number; evidence_kind:string; visual_evidence_id:string; modality:string; }
 export interface Citation { evidence_id:string; chunk_id:string; source_version_id:string; locator:string|null; evidence_kind:string; visual_evidence_id:string; modality:string; }

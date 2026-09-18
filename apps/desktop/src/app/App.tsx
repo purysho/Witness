@@ -12,6 +12,7 @@ import type {
   LabComparison,
   SourceVersionSummary,
   VisualEvidencePreview,
+  WorkspaceHealthReport,
   WorkspaceOpenResult,
 } from "../../../../contracts/generated/rpc";
 import { engine } from "../contracts/client";
@@ -48,6 +49,8 @@ export function App() {
   const [tab, setTab] = useState<Tab>("ask");
   const [workspacePath, setWorkspacePath] = useState(rememberedWorkspace);
   const [workspace, setWorkspace] = useState<WorkspaceOpenResult | null>(null);
+  const [workspaceHealth, setWorkspaceHealth] =
+    useState<WorkspaceHealthReport | null>(null);
   const [sourcePath, setSourcePath] = useState("");
   const [validFrom, setValidFrom] = useState("");
   const [sources, setSources] = useState<SourceVersionSummary[]>([]);
@@ -76,6 +79,13 @@ export function App() {
   async function refreshSources() {
     setSources((await engine.listSources()).sources);
   }
+
+  async function refreshWorkspaceHealth() {
+    const report = await engine.workspaceHealth();
+    setWorkspaceHealth(report);
+    return report;
+  }
+
 
   async function refreshLab() {
     const [datasets, runs] = await Promise.all([
@@ -107,14 +117,25 @@ export function App() {
       setWorkspacePath(opened.path);
       rememberWorkspace(opened.path);
       setWorkspace(opened);
+      setWorkspaceHealth(null);
       setResult(null);
       setGraph(null);
       setLabComparison(null);
       setLabExportPath(null);
       setAttackResult(null);
       setVisualPreview(null);
-      await Promise.all([refreshSources(), refreshLab(), refreshAttack()]);
-      setStatus("Workspace open · " + opened.embedding_provider_id);
+      const [, , , health] = await Promise.all([
+        refreshSources(),
+        refreshLab(),
+        refreshAttack(),
+        refreshWorkspaceHealth(),
+      ]);
+      setStatus(
+        "Workspace open · " +
+          opened.embedding_provider_id +
+          " · health " +
+          health.status,
+      );
     } catch (reason) {
       setError(String(reason));
     } finally {
@@ -175,11 +196,34 @@ export function App() {
     setError(null);
     try {
       await engine.importSource(sourcePath, validFrom || undefined);
-      await refreshSources();
+      await Promise.all([refreshSources(), refreshWorkspaceHealth()]);
       setSourcePath("");
       setStatus(
         "Source indexed into lexical, dense, temporal, hierarchy, graph, and visual projections.",
       );
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function repairWorkspaceIndexes() {
+    setBusy(true);
+    setError(null);
+    try {
+      const repaired = await engine.repairWorkspace();
+      setWorkspaceHealth(repaired.after);
+      setStatus(
+        repaired.actions.length
+          ? "Workspace repaired · " + repaired.actions.join(" · ")
+          : "Workspace checked · no repairable projections needed",
+      );
+      if (!repaired.protected_state_unchanged) {
+        throw new Error(
+          "Repair changed protected workspace state; this should never occur.",
+        );
+      }
     } catch (reason) {
       setError(String(reason));
     } finally {
@@ -556,6 +600,42 @@ export function App() {
                   onClick={openWorkspace}
                 >
                   Open remembered workspace
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
+        {workspace && workspaceHealth && (
+          <section
+            className={
+              "workspace-health-panel health-" + workspaceHealth.status
+            }
+          >
+            <div>
+              <span>WORKSPACE HEALTH</span>
+              <strong>{workspaceHealth.status.toUpperCase()}</strong>
+              <small>
+                {workspaceHealth.issues.length === 0
+                  ? "Canonical evidence and derived projections are consistent."
+                  : workspaceHealth.issues[0].detail}
+              </small>
+            </div>
+            <div className="workspace-health-actions">
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={() => void refreshWorkspaceHealth()}
+              >
+                Recheck
+              </button>
+              {workspaceHealth.issues.some((item) => item.repairable) && (
+                <button
+                  className="primary"
+                  disabled={busy}
+                  onClick={repairWorkspaceIndexes}
+                >
+                  Repair derived indexes
                 </button>
               )}
             </div>

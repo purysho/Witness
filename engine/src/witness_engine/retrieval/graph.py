@@ -163,6 +163,42 @@ class LocalEvidenceGraph:
                         )
         return claim_edges
 
+    def rebuild_from_chunks(self) -> int:
+        """Rebuild the disposable claim/entity graph from canonical chunks."""
+
+        rows = self.connection.execute(
+            """
+            SELECT
+                chunk_id, block_id, text, start_offset, end_offset,
+                source_version_id, locator
+            FROM indexed_chunks
+            ORDER BY chunk_id
+            """
+        ).fetchall()
+        chunks = [
+            (
+                Chunk(
+                    chunk_id=row["chunk_id"],
+                    block_id=row["block_id"],
+                    text=row["text"],
+                    start=int(row["start_offset"]),
+                    end=int(row["end_offset"]),
+                ),
+                row["source_version_id"],
+                row["locator"],
+            )
+            for row in rows
+        ]
+
+        with self.connection:
+            self.connection.execute("DELETE FROM graph_claim_entities")
+            self.connection.execute("DELETE FROM graph_claim_evidence")
+            self.connection.execute("DELETE FROM graph_entities")
+            self.connection.execute("DELETE FROM graph_claims_fts")
+            self.connection.execute("DELETE FROM graph_claims")
+
+        return self.index_chunks(chunks)
+
     @staticmethod
     def _match_expression(query: str) -> str:
         tokens = [token for token in _TOKEN_RE.findall(query) if token.casefold() not in _STOPWORDS]
