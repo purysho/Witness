@@ -10,6 +10,7 @@ from .models import (
 from .pdf import PdfVisualExtractionResult, index_pdf_visual_evidence
 from .providers import (
     DeterministicHashVisualEmbeddingProvider,
+    OpenClipVisualEmbeddingProvider,
     VisualEmbeddingProvider,
 )
 from .store import VisualEvidenceStore
@@ -18,6 +19,7 @@ __all__ = [
     "DeterministicHashVisualEmbeddingProvider",
     "LocalVisualVectorIndex",
     "NormalizedRegion",
+    "OpenClipVisualEmbeddingProvider",
     "PdfVisualExtractionResult",
     "VisualEmbeddingProvider",
     "VisualEvidence",

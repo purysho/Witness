@@ -14,6 +14,9 @@ dependencies = [
 embeddings = [
   "sentence-transformers>=3.0",
 ]
+vision = [
+  "open-clip-torch>=3.3,<4",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

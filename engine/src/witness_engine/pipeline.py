@@ -67,9 +67,9 @@ def index_document(
         raise ValueError(
             "vector_index and embedding_provider must be supplied together"
         )
-    if (visual_index is None) != (visual_embedding_provider is None):
+    if visual_index is None and visual_embedding_provider is not None:
         raise ValueError(
-            "visual_index and visual_embedding_provider must be supplied together"
+            "visual_embedding_provider requires visual_index"
         )
 
     source_path = Path(path).expanduser().resolve()
@@ -126,7 +126,6 @@ def index_document(
     if (
         document.media_type == "application/pdf"
         and visual_index is not None
-        and visual_embedding_provider is not None
     ):
         try:
             visual_result = index_pdf_visual_evidence(
@@ -136,9 +135,10 @@ def index_document(
             )
             visual_evidence_count = len(visual_result.evidence)
             visual_warnings = visual_result.warnings
-            visual_embedding_count = visual_index.sync(
-                visual_embedding_provider
-            )
+            if visual_embedding_provider is not None:
+                visual_embedding_count = visual_index.sync(
+                    visual_embedding_provider
+                )
         except Exception as exc:
             visual_warnings = (
                 "visual extraction failed "

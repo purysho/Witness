@@ -9,6 +9,7 @@ from witness_engine.multimodal import (
     DeterministicHashVisualEmbeddingProvider,
     LocalVisualVectorIndex,
     NormalizedRegion,
+    OpenClipVisualEmbeddingProvider,
     VisualEvidence,
     VisualEvidenceStore,
     VisualModality,
@@ -368,5 +369,82 @@ def test_visual_preview_rpc_returns_region_and_bounded_preview(tmp_path):
         assert preview["preview_data_url"].startswith("data:image/jpeg;base64,")
         assert preview["preview_warning"] is None
         assert len(preview["preview_data_url"]) < 1_000_000
+    finally:
+        service.close()
+
+
+
+def test_visual_extraction_does_not_require_embedding_provider(tmp_path):
+    pdf_path = tmp_path / "extract-only.pdf"
+    image = Image.new("RGB", (100, 50), (160, 160, 160))
+    image.save(pdf_path, format="PDF", resolution=72.0)
+
+    database = tmp_path / "extract-only.sqlite3"
+    with LocalEvidenceIndex(database) as lexical:
+        visual_index = LocalVisualVectorIndex(lexical)
+        result = index_document(
+            pdf_path,
+            lexical,
+            visual_index=visual_index,
+        )
+
+        assert result.visual_evidence_count >= 1
+        assert result.visual_embedding_count == 0
+        assert visual_index.count() == 0
+        assert VisualEvidenceStore(lexical).evidence_count() >= 1
+
+
+def test_openclip_provider_is_lazy_and_identifies_configuration():
+    provider = OpenClipVisualEmbeddingProvider(
+        model_name="ViT-B-32",
+        pretrained="laion2b_s34b_b79k",
+        device="cpu",
+    )
+    assert provider.provider_id == (
+        "openclip:ViT-B-32:laion2b_s34b_b79k:cpu"
+    )
+
+
+def test_rpc_keeps_visual_search_advisory_without_semantic_provider(
+    tmp_path,
+    monkeypatch,
+):
+    monkeypatch.delenv("WITNESS_VISUAL_PROVIDER", raising=False)
+    workspace = tmp_path / "workspace-no-vision"
+    pdf_path = tmp_path / "visual-only.pdf"
+    image = Image.new("RGB", (120, 60), (190, 190, 190))
+    image.save(pdf_path, format="PDF", resolution=72.0)
+
+    service = RpcService()
+    try:
+        opened = service.handle(
+            "workspace.open",
+            {"path": str(workspace)},
+        )
+        assert opened["visual_embedding_provider_id"] is None
+
+        imported = service.handle(
+            "source.import",
+            {"path": str(pdf_path)},
+        )
+        assert imported["visual_evidence_count"] >= 1
+        assert imported["visual_embedding_count"] == 0
+
+        result = service.handle(
+            "query.run",
+            {"question": "What does the image show?"},
+        )
+        route_event = next(
+            event
+            for event in result["trace"]
+            if event["stage"] == "route.decided"
+        )
+        visual = next(
+            item
+            for item in route_event["payload"]["plan"]["routes"]
+            if item["route"] == "visual"
+        )
+        assert visual["requested"] is True
+        assert visual["executable"] is False
     finally:
         service.close()

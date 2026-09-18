@@ -84,3 +84,21 @@ Cited visual evidence can be opened directly from Ask or Trace. The desktop requ
 The viewer displays the extracted asset beside a normalized source-page map. The map is deliberately schematic rather than pretending to be a PDF renderer: its highlighted box is computed directly from the stored normalized region, while the extracted source asset is shown separately. The viewer also exposes the exact locator, source-version ID, original media type, and asset SHA-256.
 
 Preview generation never changes visual evidence identity. It is a disposable presentation artifact derived from the content-addressed source asset.
+
+
+## Semantic provider boundary
+
+Witness deliberately separates visual evidence extraction from semantic visual retrieval.
+
+PDF import always stores provenance-safe visual evidence when the visual store is available. A visual embedding provider is optional: without one, images remain inspectable/citable artifacts and the transparent router records visual requests as advisory rather than executing a meaningless similarity search.
+
+The dependency-free `DeterministicHashVisualEmbeddingProvider` is a plumbing/test baseline only. It is not semantic and is not enabled by default in the desktop engine.
+
+For real image-to-text retrieval, Witness includes an optional lazy `OpenClipVisualEmbeddingProvider`. Install the engine's `vision` extra and explicitly configure:
+
+- `WITNESS_VISUAL_PROVIDER=openclip`;
+- optional `WITNESS_OPENCLIP_MODEL`;
+- optional `WITNESS_OPENCLIP_PRETRAINED`;
+- optional `WITNESS_OPENCLIP_DEVICE`.
+
+For deterministic plumbing experiments only, `WITNESS_VISUAL_PROVIDER=hash` remains available explicitly. Provider identity is persisted in routed Lab configuration snapshots. Provider selection is expected to move into the normal desktop provider configuration surface during Phase 8.

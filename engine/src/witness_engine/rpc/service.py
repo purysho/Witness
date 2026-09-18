@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import base64
+import os
 from dataclasses import asdict
 from datetime import datetime
 from io import BytesIO
@@ -26,6 +27,8 @@ from ..graph.view import build_graph_snapshot
 from ..multimodal import (
     DeterministicHashVisualEmbeddingProvider,
     LocalVisualVectorIndex,
+    OpenClipVisualEmbeddingProvider,
+    VisualEmbeddingProvider,
     VisualEvidenceStore,
 )
 from ..pipeline import ask_evidence, index_document
@@ -79,6 +82,36 @@ class RpcServiceError(RuntimeError):
         self.details = details
 
 
+def _configured_visual_provider() -> VisualEmbeddingProvider | None:
+    configured = os.environ.get(
+        "WITNESS_VISUAL_PROVIDER",
+        "",
+    ).strip().casefold()
+    if not configured:
+        return None
+    if configured == "hash":
+        return DeterministicHashVisualEmbeddingProvider(dimensions=64)
+    if configured == "openclip":
+        return OpenClipVisualEmbeddingProvider(
+            model_name=os.environ.get(
+                "WITNESS_OPENCLIP_MODEL",
+                "ViT-B-32",
+            ).strip() or "ViT-B-32",
+            pretrained=os.environ.get(
+                "WITNESS_OPENCLIP_PRETRAINED",
+                "laion2b_s34b_b79k",
+            ).strip() or "laion2b_s34b_b79k",
+            device=os.environ.get(
+                "WITNESS_OPENCLIP_DEVICE",
+                "cpu",
+            ).strip() or "cpu",
+        )
+    raise RuntimeError(
+        "Unsupported WITNESS_VISUAL_PROVIDER. "
+        "Use 'openclip', 'hash', or leave it unset."
+    )
+
+
 class RpcService:
     def __init__(self) -> None:
         self.workspace_path: Path | None = None
@@ -88,9 +121,7 @@ class RpcService:
         self.embedding_provider = DeterministicHashEmbeddingProvider(
             dimensions=64
         )
-        self.visual_embedding_provider = (
-            DeterministicHashVisualEmbeddingProvider(dimensions=64)
-        )
+        self.visual_embedding_provider = _configured_visual_provider()
 
     def close(self) -> None:
         if self.vectors is not None:
@@ -160,6 +191,8 @@ class RpcService:
             "embedding_provider_id": self.embedding_provider.provider_id,
             "visual_embedding_provider_id": (
                 self.visual_embedding_provider.provider_id
+                if self.visual_embedding_provider is not None
+                else None
             ),
         }
 
@@ -235,7 +268,11 @@ class RpcService:
             lexical,
             vectors,
             self.embedding_provider,
-            visual_index=self.visual_index,
+            visual_index=(
+                self.visual_index
+                if self.visual_embedding_provider is not None
+                else None
+            ),
             visual_embedding_provider=self.visual_embedding_provider,
             limit=limit,
             candidate_pool=max(30, limit),
@@ -332,7 +369,11 @@ class RpcService:
                 vectors,
                 self.embedding_provider,
                 store=store,
-                visual_index=self.visual_index,
+                visual_index=(
+                    self.visual_index
+                    if self.visual_embedding_provider is not None
+                    else None
+                ),
                 visual_embedding_provider=self.visual_embedding_provider,
             ).run(
                 dataset,
