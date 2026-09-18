@@ -9,7 +9,7 @@ from hashlib import sha256
 from pathlib import Path
 import sqlite3
 from time import perf_counter
-from typing import Sequence
+from typing import Callable, Sequence
 from uuid import uuid4
 
 from ..answering import (
@@ -31,6 +31,7 @@ from ..retrieval import (
     TransparentRetrievalRouter,
 )
 from ..retrieval.models import RetrievalCandidate
+from ..tasks import OperationCancelled
 from ..retrieval.query import analyze_query
 from .metrics import aggregate_case_results, score_case
 from .models import (
@@ -228,6 +229,8 @@ class EvalRunner:
         self,
         dataset: EvalDataset,
         config: EvalConfig,
+        *,
+        cancel_check: Callable[[], None] | None = None,
     ) -> EvalRunResult:
         dataset_summary = self.store.register_dataset(dataset)
         reranker: RerankProvider = (
@@ -265,6 +268,12 @@ class EvalRunner:
 
         for case in dataset.cases:
             started = perf_counter()
+            if cancel_check is not None:
+                try:
+                    cancel_check()
+                except OperationCancelled:
+                    self.store.cancel_run(run_id)
+                    raise
             providers = [
                 self.embedding_provider,
                 reranker,
@@ -314,6 +323,8 @@ class EvalRunner:
                     ),
                     rrf_k=config.rrf_k,
                 )
+                if cancel_check is not None:
+                    cancel_check()
                 latency_ms = (
                     perf_counter() - started
                 ) * 1000.0
@@ -359,6 +370,9 @@ class EvalRunner:
                     metrics=metrics,
                     ask_result=ask_result.to_dict(),
                 )
+            except OperationCancelled:
+                self.store.cancel_run(run_id)
+                raise
             except Exception as exc:
                 latency_ms = (
                     perf_counter() - started
@@ -381,6 +395,12 @@ class EvalRunner:
             )
             case_results.append(result)
 
+        if cancel_check is not None:
+            try:
+                cancel_check()
+            except OperationCancelled:
+                self.store.cancel_run(run_id)
+                raise
         aggregate = aggregate_case_results(case_results)
         self.store.complete_run(run_id, aggregate)
         return self.store.load_run(run_id)

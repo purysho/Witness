@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import sqlite3
 import struct
-from typing import Sequence
+from typing import Callable, Sequence
 
 from ..retrieval.embeddings import Vector, normalize
 from ..retrieval.index import LocalEvidenceIndex
@@ -69,6 +69,7 @@ class LocalVisualVectorIndex:
         provider: VisualEmbeddingProvider,
         *,
         batch_size: int = 32,
+        cancel_check: Callable[[], None] | None = None,
     ) -> int:
         if batch_size < 1:
             raise ValueError("batch_size must be >= 1")
@@ -98,18 +99,24 @@ class LocalVisualVectorIndex:
 
         indexed = 0
         for start in range(0, len(pending), batch_size):
+            if cancel_check is not None:
+                cancel_check()
             batch = pending[start : start + batch_size]
             payloads = [
                 self.store.asset_bytes(row["asset_sha256"])
                 for row in batch
             ]
             vectors = provider.embed_images(payloads)
+            if cancel_check is not None:
+                cancel_check()
             if len(vectors) != len(batch):
                 raise VisualVectorIndexError(
                     "Visual provider returned a different number of vectors than images"
                 )
             with self.connection:
                 for row, raw in zip(batch, vectors):
+                    if cancel_check is not None:
+                        cancel_check()
                     vector = normalize(raw)
                     if not vector:
                         raise VisualVectorIndexError(

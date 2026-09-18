@@ -185,6 +185,17 @@ class EvalStore:
                 ),
             )
 
+    def cancel_run(self, run_id: str) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                UPDATE eval_runs
+                SET status = 'cancelled', completed_at = ?
+                WHERE run_id = ?
+                """,
+                (_now(), run_id),
+            )
+
     def complete_run(self, run_id: str, metrics: EvalRunMetrics) -> None:
         with self.connection:
             self.connection.execute(

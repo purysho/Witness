@@ -49,10 +49,11 @@ export const engine = {
     call<WorkspaceHealthReport>("workspace.health"),
   repairWorkspace: () =>
     call<WorkspaceRepairResult>("workspace.repair"),
-  importSource: (path: string, validFrom?: string) =>
+  importSource: (path: string, validFrom?: string, jobId?: string) =>
     call<Record<string, unknown>>("source.import", {
       path,
       ...(validFrom ? { valid_from: validFrom } : {}),
+      ...(jobId ? { job_id: jobId } : {}),
     }),
   listSources: () =>
     call<{ sources: SourceVersionSummary[] }>("source.list"),
@@ -69,15 +70,25 @@ export const engine = {
     call<VisualEvidencePreview>("visual.evidence.get", {
       visual_evidence_id: visualEvidenceId,
     }),
+  cancelJob: (workspacePath: string, jobId: string) =>
+    invoke<void>("cancel_job", {
+      workspacePath,
+      jobId,
+    }),
 
   labLoadDataset: (path: string) =>
     call<EvalDatasetSummary>("lab.dataset.load", { path }),
   labDatasets: () =>
     call<{ datasets: EvalDatasetSummary[] }>("lab.dataset.list"),
-  labRun: (datasetFingerprint: string, config: EvalConfigInput) =>
+  labRun: (
+    datasetFingerprint: string,
+    config: EvalConfigInput,
+    jobId?: string,
+  ) =>
     call<LabRunResult>("lab.run", {
       dataset_fingerprint: datasetFingerprint,
       config,
+      ...(jobId ? { job_id: jobId } : {}),
     }),
   labRuns: (limit = 50) =>
     call<{ runs: EvalRunSummary[] }>("lab.runs", { limit }),
@@ -102,11 +113,13 @@ export const engine = {
     manifestFingerprint: string,
     datasetFingerprint: string,
     config: EvalConfigInput,
+    jobId?: string,
   ) =>
     call<AttackRunResult>("attack.run", {
       manifest_fingerprint: manifestFingerprint,
       dataset_fingerprint: datasetFingerprint,
       config,
+      ...(jobId ? { job_id: jobId } : {}),
     }),
   attackRuns: (limit = 50) =>
     call<{ runs: AttackRunListItem[] }>("attack.runs", { limit }),

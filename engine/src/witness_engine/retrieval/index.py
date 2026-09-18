@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import sqlite3
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Callable, Iterable, Sequence
 
 from ..chunking import Chunk
 from .models import RetrievalCandidate
@@ -117,9 +117,13 @@ class LocalEvidenceIndex:
     def index_chunks(
         self,
         rows: Iterable[tuple[Chunk, str, str]],
+        *,
+        cancel_check: Callable[[], None] | None = None,
     ) -> int:
         count = 0
         for chunk, source_version_id, locator in rows:
+            if cancel_check is not None:
+                cancel_check()
             self.index_chunk(
                 chunk,
                 source_version_id=source_version_id,

@@ -12,7 +12,10 @@ fn main() {
             app.manage(engine::EngineState::new(app.handle().clone()));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![commands::engine_call])
+        .invoke_handler(tauri::generate_handler![
+            commands::engine_call,
+            commands::cancel_job
+        ])
         .run(tauri::generate_context!())
         .expect("error while running Witness desktop");
 }

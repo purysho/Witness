@@ -45,6 +45,18 @@ function rememberWorkspace(path: string) {
   }
 }
 
+function createJobId(kind: string): string {
+  const suffix =
+    globalThis.crypto?.randomUUID?.() ??
+    Math.random().toString(36).slice(2);
+  return kind + "-" + Date.now() + "-" + suffix;
+}
+
+function isCancellation(reason: unknown): boolean {
+  const message = String(reason).toLocaleLowerCase();
+  return message.includes("cancelled") || message.includes("canceled");
+}
+
 export function App() {
   const [tab, setTab] = useState<Tab>("ask");
   const [workspacePath, setWorkspacePath] = useState(rememberedWorkspace);
@@ -66,6 +78,8 @@ export function App() {
   const [attackResult, setAttackResult] = useState<AttackRunResult | null>(null);
   const [visualPreview, setVisualPreview] = useState<VisualEvidencePreview | null>(null);
   const [busy, setBusy] = useState(false);
+  const [activeJob, setActiveJob] =
+    useState<{ id: string; label: string } | null>(null);
   const [status, setStatus] = useState("Engine not contacted yet.");
   const [error, setError] = useState<string | null>(null);
 
@@ -192,18 +206,30 @@ export function App() {
   }
 
   async function importSource() {
+    const jobId = createJobId("import");
     setBusy(true);
+    setActiveJob({ id: jobId, label: "source import" });
     setError(null);
     try {
-      await engine.importSource(sourcePath, validFrom || undefined);
+      await engine.importSource(
+        sourcePath,
+        validFrom || undefined,
+        jobId,
+      );
       await Promise.all([refreshSources(), refreshWorkspaceHealth()]);
       setSourcePath("");
       setStatus(
         "Source indexed into lexical, dense, temporal, hierarchy, graph, and visual projections.",
       );
     } catch (reason) {
-      setError(String(reason));
+      if (isCancellation(reason)) {
+        await Promise.all([refreshSources(), refreshWorkspaceHealth()]);
+        setStatus("Source import cancelled · partial new-version state rolled back.");
+      } else {
+        setError(String(reason));
+      }
     } finally {
+      setActiveJob((current) => current?.id === jobId ? null : current);
       setBusy(false);
     }
   }
@@ -282,12 +308,26 @@ export function App() {
     configA: EvalConfigInput,
     configB: EvalConfigInput,
   ) {
+    const jobA = createJobId("lab-a");
+    let activeId = jobA;
     setBusy(true);
+    setActiveJob({ id: jobA, label: "Lab run A" });
     setError(null);
     setLabExportPath(null);
     try {
-      const runA = await engine.labRun(datasetFingerprint, configA);
-      const runB = await engine.labRun(datasetFingerprint, configB);
+      const runA = await engine.labRun(
+        datasetFingerprint,
+        configA,
+        jobA,
+      );
+      const jobB = createJobId("lab-b");
+      activeId = jobB;
+      setActiveJob({ id: jobB, label: "Lab run B" });
+      const runB = await engine.labRun(
+        datasetFingerprint,
+        configB,
+        jobB,
+      );
       const comparison = await engine.labCompare(
         runA.run.run_id,
         runB.run.run_id,
@@ -301,8 +341,14 @@ export function App() {
           comparison.run_b.config.retrieval_mode,
       );
     } catch (reason) {
-      setError(String(reason));
+      if (isCancellation(reason)) {
+        await refreshLab();
+        setStatus("Lab run cancelled · completed case results were preserved.");
+      } else {
+        setError(String(reason));
+      }
     } finally {
+      setActiveJob((current) => current?.id === activeId ? null : current);
       setBusy(false);
     }
   }
@@ -384,13 +430,16 @@ export function App() {
     datasetFingerprint: string,
     config: EvalConfigInput,
   ) {
+    const jobId = createJobId("attack");
     setBusy(true);
+    setActiveJob({ id: jobId, label: "Attack Lab run" });
     setError(null);
     try {
       const result = await engine.attackRun(
         manifestFingerprint,
         datasetFingerprint,
         config,
+        jobId,
       );
       setAttackResult(result);
       await Promise.all([refreshAttack(), refreshLab()]);
@@ -403,8 +452,14 @@ export function App() {
           " invariant failures",
       );
     } catch (reason) {
-      setError(String(reason));
+      if (isCancellation(reason)) {
+        await Promise.all([refreshAttack(), refreshLab()]);
+        setStatus("Attack Lab run cancelled · canonical corpus remains isolated.");
+      } else {
+        setError(String(reason));
+      }
     } finally {
+      setActiveJob((current) => current?.id === jobId ? null : current);
       setBusy(false);
     }
   }
@@ -454,6 +509,19 @@ export function App() {
     setStatus(
       "Opened " + side + " attack trace · " + caseId,
     );
+  }
+
+  async function cancelActiveJob() {
+    if (!workspace || !activeJob) {
+      return;
+    }
+    setError(null);
+    try {
+      await engine.cancelJob(workspace.path, activeJob.id);
+      setStatus("Cancellation requested · " + activeJob.label);
+    } catch (reason) {
+      setError("Could not request cancellation: " + String(reason));
+    }
   }
 
   async function openVisualEvidence(visualEvidenceId: string) {
@@ -554,6 +622,14 @@ export function App() {
               {workspace ? "Reopen" : "Open workspace"}
             </button>
           </div>
+          {activeJob && (
+            <button
+              className="cancel-job"
+              onClick={cancelActiveJob}
+            >
+              Cancel {activeJob.label}
+            </button>
+          )}
           <div className="engine-status">
             <span className={workspace ? "status-dot ready" : "status-dot"} />
             <div>

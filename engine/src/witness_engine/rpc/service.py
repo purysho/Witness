@@ -41,6 +41,12 @@ from ..retrieval import (
     LocalTemporalIndex,
     LocalVectorIndex,
 )
+from ..tasks import (
+    CancellationProbe,
+    OperationCancelled,
+    TaskStore,
+    validate_job_id,
+)
 
 ALLOWED_METHODS = frozenset(
     {
@@ -187,6 +193,7 @@ class RpcService:
         LocalRunStore(self.lexical)
         EvalStore(self.lexical)
         AttackStore(self.lexical)
+        TaskStore(self.lexical).mark_interrupted()
         return {
             "path": str(path),
             "database": str(database),
@@ -218,6 +225,44 @@ class RpcService:
             visual_index=self.visual_index,
             visual_embedding_provider=self.visual_embedding_provider,
         ).to_dict()
+
+    def _begin_task(
+        self,
+        params: dict[str, Any],
+        kind: str,
+    ) -> tuple[CancellationProbe | None, TaskStore | None, str | None]:
+        raw_job_id = str(params.get("job_id", "")).strip()
+        if not raw_job_id:
+            return None, None, None
+        try:
+            job_id = validate_job_id(raw_job_id)
+        except ValueError as exc:
+            raise RpcServiceError(
+                "invalid_job_id",
+                str(exc),
+            ) from exc
+        lexical, _ = self._require_workspace()
+        assert self.workspace_path is not None
+        probe = CancellationProbe(self.workspace_path, job_id)
+        probe.prepare()
+        store = TaskStore(lexical)
+        store.start(job_id, kind)
+        return probe, store, job_id
+
+    @staticmethod
+    def _finish_task(
+        probe: CancellationProbe | None,
+        store: TaskStore | None,
+        job_id: str | None,
+        status: str,
+        detail: str = "",
+    ) -> None:
+        try:
+            if store is not None and job_id is not None:
+                store.finish(job_id, status, detail)
+        finally:
+            if probe is not None:
+                probe.close()
 
     def _source_rows(self) -> list[dict[str, Any]]:
         lexical, _ = self._require_workspace()
@@ -258,17 +303,51 @@ class RpcService:
             else None
         )
         assert self.visual_index is not None
-        return asdict(
-            index_document(
-                source_path,
-                lexical,
-                vector_index=vectors,
-                embedding_provider=self.embedding_provider,
-                visual_index=self.visual_index,
-                visual_embedding_provider=self.visual_embedding_provider,
-                valid_from=valid_from,
-            )
+        probe, task_store, job_id = self._begin_task(
+            params,
+            "source.import",
         )
+        try:
+            result = asdict(
+                index_document(
+                    source_path,
+                    lexical,
+                    vector_index=vectors,
+                    embedding_provider=self.embedding_provider,
+                    visual_index=self.visual_index,
+                    visual_embedding_provider=self.visual_embedding_provider,
+                    valid_from=valid_from,
+                    cancel_check=(probe.check if probe is not None else None),
+                )
+            )
+            self._finish_task(
+                probe,
+                task_store,
+                job_id,
+                "completed",
+            )
+            return result
+        except OperationCancelled as exc:
+            self._finish_task(
+                probe,
+                task_store,
+                job_id,
+                "cancelled",
+                str(exc),
+            )
+            raise RpcServiceError(
+                "cancelled",
+                str(exc),
+            ) from exc
+        except Exception as exc:
+            self._finish_task(
+                probe,
+                task_store,
+                job_id,
+                "failed",
+                f"{type(exc).__name__}: {exc}",
+            )
+            raise
 
     def _run_query(
         self,
@@ -380,6 +459,10 @@ class RpcService:
                 "invalid_params",
                 "lab.run requires dataset_fingerprint",
             )
+        probe, task_store, job_id = self._begin_task(
+            params,
+            "lab.run",
+        )
         try:
             store = EvalStore(lexical)
             dataset = store.load_dataset(fingerprint)
@@ -401,13 +484,48 @@ class RpcService:
             ).run(
                 dataset,
                 config,
+                cancel_check=(probe.check if probe is not None else None),
             )
+            self._finish_task(
+                probe,
+                task_store,
+                job_id,
+                "completed",
+            )
+            return self._compact_lab_run(result)
+        except OperationCancelled as exc:
+            self._finish_task(
+                probe,
+                task_store,
+                job_id,
+                "cancelled",
+                str(exc),
+            )
+            raise RpcServiceError(
+                "cancelled",
+                str(exc),
+            ) from exc
         except (KeyError, ValidationError, ValueError) as exc:
+            self._finish_task(
+                probe,
+                task_store,
+                job_id,
+                "failed",
+                f"{type(exc).__name__}: {exc}",
+            )
             raise RpcServiceError(
                 "invalid_lab_run",
                 str(exc),
             ) from exc
-        return self._compact_lab_run(result)
+        except Exception as exc:
+            self._finish_task(
+                probe,
+                task_store,
+                job_id,
+                "failed",
+                f"{type(exc).__name__}: {exc}",
+            )
+            raise
 
     def _lab_export(
         self,
@@ -500,6 +618,10 @@ class RpcService:
                 "invalid_params",
                 "attack.run requires manifest_fingerprint and dataset_fingerprint",
             )
+        probe, task_store, job_id = self._begin_task(
+            params,
+            "attack.run",
+        )
         try:
             manifest = self._attack_store().load_manifest(
                 manifest_fingerprint
@@ -516,13 +638,52 @@ class RpcService:
                 self.embedding_provider,
                 workspace_path=self.workspace_path,
                 store=self._attack_store(),
-            ).run(manifest, dataset, config)
+            ).run(
+                manifest,
+                dataset,
+                config,
+                cancel_check=(probe.check if probe is not None else None),
+            )
+            self._finish_task(
+                probe,
+                task_store,
+                job_id,
+                "completed",
+            )
+            return result.model_dump(mode="json")
+        except OperationCancelled as exc:
+            self._finish_task(
+                probe,
+                task_store,
+                job_id,
+                "cancelled",
+                str(exc),
+            )
+            raise RpcServiceError(
+                "cancelled",
+                str(exc),
+            ) from exc
         except (KeyError, ValidationError, ValueError, OSError) as exc:
+            self._finish_task(
+                probe,
+                task_store,
+                job_id,
+                "failed",
+                f"{type(exc).__name__}: {exc}",
+            )
             raise RpcServiceError(
                 "attack_run_failed",
                 str(exc),
             ) from exc
-        return result.model_dump(mode="json")
+        except Exception as exc:
+            self._finish_task(
+                probe,
+                task_store,
+                job_id,
+                "failed",
+                f"{type(exc).__name__}: {exc}",
+            )
+            raise
 
     def _visual_evidence_get(
         self,

@@ -153,6 +153,31 @@ class LocalTemporalIndex:
                 (next_valid, previous_id, next_id, row["source_version_id"]),
             )
 
+    def remove_source_version(self, source_version_id: str) -> bool:
+        """Remove one version's temporal metadata and repair its version chain."""
+
+        row = self.connection.execute(
+            """
+            SELECT logical_source_id
+            FROM source_version_metadata
+            WHERE source_version_id = ?
+            """,
+            (source_version_id,),
+        ).fetchone()
+        if row is None:
+            return False
+        logical_source_id = row["logical_source_id"]
+        with self.connection:
+            self.connection.execute(
+                """
+                DELETE FROM source_version_metadata
+                WHERE source_version_id = ?
+                """,
+                (source_version_id,),
+            )
+            self._rebuild_chain(logical_source_id)
+        return True
+
     def _latest_versions(self) -> tuple[str, ...]:
         rows = self.connection.execute(
             """

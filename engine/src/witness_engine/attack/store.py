@@ -169,6 +169,17 @@ class AttackStore:
             )
         return completed
 
+    def cancel_run(self, attack_run_id: str) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                UPDATE attack_runs
+                SET status = 'cancelled', completed_at = ?
+                WHERE attack_run_id = ?
+                """,
+                (_now(), attack_run_id),
+            )
+
     def fail_run(self, attack_run_id: str) -> None:
         with self.connection:
             self.connection.execute(

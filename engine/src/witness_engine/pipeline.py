@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Callable
 
 from .answering.ask import AskEngine, AskResult
 from .answering.providers import GenerationProvider
@@ -27,6 +28,135 @@ from .retrieval.rerank import RerankProvider
 from .retrieval.routing import TransparentRetrievalRouter
 from .retrieval.temporal import LocalTemporalIndex
 from .retrieval.vector_index import LocalVectorIndex
+from .tasks import OperationCancelled
+
+
+def _table_exists(index: LocalEvidenceIndex, name: str) -> bool:
+    row = index.connection.execute(
+        """
+        SELECT 1
+        FROM sqlite_master
+        WHERE type = 'table' AND name = ?
+        """,
+        (name,),
+    ).fetchone()
+    return row is not None
+
+
+def _rollback_new_source_version(
+    index: LocalEvidenceIndex,
+    source_version_id: str,
+    temporal: LocalTemporalIndex,
+    preexisting_visual_assets: set[str],
+) -> None:
+    """Remove partial state for a source version that did not exist before."""
+
+    connection = index.connection
+    with connection:
+        if _table_exists(index, "visual_embeddings") and _table_exists(
+            index,
+            "visual_evidence",
+        ):
+            connection.execute(
+                """
+                DELETE FROM visual_embeddings
+                WHERE visual_evidence_id IN (
+                    SELECT visual_evidence_id
+                    FROM visual_evidence
+                    WHERE source_version_id = ?
+                )
+                """,
+                (source_version_id,),
+            )
+        if _table_exists(index, "visual_evidence"):
+            connection.execute(
+                """
+                DELETE FROM visual_evidence
+                WHERE source_version_id = ?
+                """,
+                (source_version_id,),
+            )
+        if _table_exists(index, "visual_assets") and _table_exists(
+            index,
+            "visual_evidence",
+        ):
+            orphan_rows = connection.execute(
+                """
+                SELECT asset_sha256
+                FROM visual_assets
+                WHERE asset_sha256 NOT IN (
+                    SELECT DISTINCT asset_sha256
+                    FROM visual_evidence
+                )
+                """
+            ).fetchall()
+            for row in orphan_rows:
+                asset_sha256 = str(row["asset_sha256"])
+                if asset_sha256 not in preexisting_visual_assets:
+                    connection.execute(
+                        """
+                        DELETE FROM visual_assets
+                        WHERE asset_sha256 = ?
+                        """,
+                        (asset_sha256,),
+                    )
+        if _table_exists(index, "indexed_blocks"):
+            connection.execute(
+                """
+                DELETE FROM indexed_blocks
+                WHERE source_version_id = ?
+                """,
+                (source_version_id,),
+            )
+        if _table_exists(index, "chunk_embeddings"):
+            connection.execute(
+                """
+                DELETE FROM chunk_embeddings
+                WHERE chunk_id IN (
+                    SELECT chunk_id
+                    FROM indexed_chunks
+                    WHERE source_version_id = ?
+                )
+                """,
+                (source_version_id,),
+            )
+        if _table_exists(index, "graph_claim_evidence"):
+            connection.execute(
+                """
+                DELETE FROM graph_claim_evidence
+                WHERE chunk_id IN (
+                    SELECT chunk_id
+                    FROM indexed_chunks
+                    WHERE source_version_id = ?
+                )
+                """,
+                (source_version_id,),
+            )
+        connection.execute(
+            """
+            DELETE FROM indexed_chunks_fts
+            WHERE chunk_id IN (
+                SELECT chunk_id
+                FROM indexed_chunks
+                WHERE source_version_id = ?
+            )
+            """,
+            (source_version_id,),
+        )
+        connection.execute(
+            """
+            DELETE FROM indexed_chunks
+            WHERE source_version_id = ?
+            """,
+            (source_version_id,),
+        )
+
+    temporal.remove_source_version(source_version_id)
+
+    # Claims/entities are disposable projections. Rebuild them after removing
+    # partial evidence so no orphaned graph search state survives cancellation.
+    if _table_exists(index, "graph_claims"):
+        LocalEvidenceGraph(index).rebuild_from_chunks()
 
 
 @dataclass(frozen=True)
@@ -56,6 +186,7 @@ def index_document(
     visual_embedding_provider: VisualEmbeddingProvider | None = None,
     valid_from: str | datetime | None = None,
     identity_key: str | None = None,
+    cancel_check: Callable[[], None] | None = None,
 ) -> IndexingResult:
     """Extract, chunk, and index any supported local document.
 
@@ -83,82 +214,139 @@ def index_document(
         source_identity,
         digest,
     )
-    document = extract_document(source_path, source_version_id)
-
-    rows = []
-    chunk_count = 0
-    for block in document.blocks:
-        for chunk in chunk_block(block, max_chars=max_chars):
-            rows.append((chunk, source_version_id, block.locator))
-            chunk_count += 1
-
-    index.index_chunks(rows)
-
-    hierarchy = LocalHierarchyIndex(index)
-    hierarchy.index_document(document)
-
-    stat = source_path.stat()
-    observed_at = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
     temporal = LocalTemporalIndex(index)
-    temporal.register_source_version(
-        source_version_id=source_version_id,
-        source_path=source_path,
-        title=document.title,
-        media_type=document.media_type,
-        observed_at=observed_at,
-        valid_from=valid_from or observed_at,
-        logical_source_key=identity_key,
+    existed_before = (
+        temporal.connection.execute(
+            """
+            SELECT 1
+            FROM source_version_metadata
+            WHERE source_version_id = ?
+            """,
+            (source_version_id,),
+        ).fetchone()
+        is not None
     )
 
-    evidence_graph = LocalEvidenceGraph(index)
-    claim_edge_count = evidence_graph.index_chunks(rows)
+    preexisting_visual_assets: set[str] = set()
+    if _table_exists(index, "visual_assets"):
+        preexisting_visual_assets = {
+            str(row["asset_sha256"])
+            for row in index.connection.execute(
+                "SELECT asset_sha256 FROM visual_assets"
+            ).fetchall()
+        }
 
-    embedded_chunk_count = 0
-    if vector_index is not None and embedding_provider is not None:
-        embedded_chunk_count = vector_index.sync(
-            embedding_provider,
-            source_version_id=source_version_id,
+    if cancel_check is not None:
+        cancel_check()
+    document = extract_document(source_path, source_version_id)
+    if cancel_check is not None:
+        cancel_check()
+
+    try:
+        rows = []
+        chunk_count = 0
+        for block in document.blocks:
+            if cancel_check is not None:
+                cancel_check()
+            for chunk in chunk_block(block, max_chars=max_chars):
+                rows.append((chunk, source_version_id, block.locator))
+                chunk_count += 1
+
+        index.index_chunks(rows, cancel_check=cancel_check)
+
+        hierarchy = LocalHierarchyIndex(index)
+        hierarchy.index_document(
+            document,
+            cancel_check=cancel_check,
         )
 
-    visual_evidence_count = 0
-    visual_embedding_count = 0
-    visual_warnings: tuple[str, ...] = ()
-    if (
-        document.media_type == "application/pdf"
-        and visual_index is not None
-    ):
-        try:
-            visual_result = index_pdf_visual_evidence(
-                source_path,
-                source_version_id,
-                index,
-            )
-            visual_evidence_count = len(visual_result.evidence)
-            visual_warnings = visual_result.warnings
-            if visual_embedding_provider is not None:
-                visual_embedding_count = visual_index.sync(
-                    visual_embedding_provider
-                )
-        except Exception as exc:
-            visual_warnings = (
-                "visual extraction failed "
-                f"({type(exc).__name__}: {exc})",
+        if cancel_check is not None:
+            cancel_check()
+        stat = source_path.stat()
+        observed_at = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)
+        temporal.register_source_version(
+            source_version_id=source_version_id,
+            source_path=source_path,
+            title=document.title,
+            media_type=document.media_type,
+            observed_at=observed_at,
+            valid_from=valid_from or observed_at,
+            logical_source_key=identity_key,
+        )
+        if cancel_check is not None:
+            cancel_check()
+
+        evidence_graph = LocalEvidenceGraph(index)
+        claim_edge_count = evidence_graph.index_chunks(
+            rows,
+            cancel_check=cancel_check,
+        )
+
+        embedded_chunk_count = 0
+        if vector_index is not None and embedding_provider is not None:
+            embedded_chunk_count = vector_index.sync(
+                embedding_provider,
+                source_version_id=source_version_id,
+                cancel_check=cancel_check,
             )
 
-    return IndexingResult(
-        path=str(source_path),
-        source_version_id=source_version_id,
-        sha256=digest,
-        block_count=len(document.blocks),
-        chunk_count=chunk_count,
-        media_type=document.media_type,
-        warnings=document.warnings,
-        embedded_chunk_count=embedded_chunk_count,
-        claim_edge_count=claim_edge_count,
-        visual_evidence_count=visual_evidence_count,
-        visual_embedding_count=visual_embedding_count,
-        visual_warnings=visual_warnings,
-    )
+        visual_evidence_count = 0
+        visual_embedding_count = 0
+        visual_warnings: tuple[str, ...] = ()
+        if (
+            document.media_type == "application/pdf"
+            and visual_index is not None
+        ):
+            try:
+                if cancel_check is not None:
+                    cancel_check()
+                visual_result = index_pdf_visual_evidence(
+                    source_path,
+                    source_version_id,
+                    index,
+                )
+                if cancel_check is not None:
+                    cancel_check()
+                visual_evidence_count = len(visual_result.evidence)
+                visual_warnings = visual_result.warnings
+                if visual_embedding_provider is not None:
+                    visual_embedding_count = visual_index.sync(
+                        visual_embedding_provider,
+                        cancel_check=cancel_check,
+                    )
+            except OperationCancelled:
+                raise
+            except Exception as exc:
+                visual_warnings = (
+                    "visual extraction failed "
+                    f"({type(exc).__name__}: {exc})",
+                )
+
+        if cancel_check is not None:
+            cancel_check()
+        return IndexingResult(
+            path=str(source_path),
+            source_version_id=source_version_id,
+            sha256=digest,
+            block_count=len(document.blocks),
+            chunk_count=chunk_count,
+            media_type=document.media_type,
+            warnings=document.warnings,
+            embedded_chunk_count=embedded_chunk_count,
+            claim_edge_count=claim_edge_count,
+            visual_evidence_count=visual_evidence_count,
+            visual_embedding_count=visual_embedding_count,
+            visual_warnings=visual_warnings,
+        )
+    except Exception:
+        if not existed_before:
+            _rollback_new_source_version(
+                index,
+                source_version_id,
+                temporal,
+                preexisting_visual_assets,
+            )
+        raise
 
 
 def index_text_document(

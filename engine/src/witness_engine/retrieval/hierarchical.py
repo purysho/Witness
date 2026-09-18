@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+from typing import Callable
 
 from ..ids import stable_id
 from ..ingestion.models import ExtractedDocument
@@ -52,9 +53,16 @@ class LocalHierarchyIndex:
             """
         )
 
-    def index_document(self, document: ExtractedDocument) -> int:
+    def index_document(
+        self,
+        document: ExtractedDocument,
+        *,
+        cancel_check: Callable[[], None] | None = None,
+    ) -> int:
         with self.connection:
             for block in document.blocks:
+                if cancel_check is not None:
+                    cancel_check()
                 self.connection.execute(
                     """
                     INSERT INTO indexed_blocks (

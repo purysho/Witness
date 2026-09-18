@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass
-from typing import Iterable
+from typing import Callable, Iterable
 
 from ..chunking import Chunk
 from ..graph.extraction import ClaimExtractionProvider, DeterministicClaimExtractionProvider
@@ -110,11 +110,20 @@ class LocalEvidenceGraph:
             """
         )
 
-    def index_chunks(self, rows: Iterable[tuple[Chunk, str, str]]) -> int:
+    def index_chunks(
+        self,
+        rows: Iterable[tuple[Chunk, str, str]],
+        *,
+        cancel_check: Callable[[], None] | None = None,
+    ) -> int:
         claim_edges = 0
         with self.connection:
             for chunk, _source_version_id, _locator in rows:
+                if cancel_check is not None:
+                    cancel_check()
                 for extracted in self.extraction_provider.extract(chunk.text):
+                    if cancel_check is not None:
+                        cancel_check()
                     sentence = extracted.text
                     normalized = _normalize_claim(sentence)
                     claim_id = stable_id("claim", normalized)
