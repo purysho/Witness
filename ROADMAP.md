@@ -2,7 +2,7 @@
 
 The build order is deliberately evidence-first. We will not start with a polished chat UI and retrofit provenance later.
 
-**Implementation status (2026-09-18):** the engine-side hybrid/specialized retrieval, reconciliation, sufficiency, context-pack, structured answer validation, and append-only Ask/Trace loop are implemented. The Phase 3/4 desktop UI exit gates remain open, so these phases are not yet declared complete.
+**Implementation status (2026-09-18): Phases 3 and 4 complete.** Hybrid/specialized retrieval, typed local IPC, evidence reconciliation and sufficiency, context packs, structured answer validation, stage-by-stage Ask/Trace, claim extraction adapters, temporal/version handling, and the desktop Ask/Trace/Graph surfaces are implemented and covered by deterministic end-to-end and cross-stack CI. Packaged sidecar distribution remains Phase 8 work.
 
 ## Phase 0 — Specification and contracts
 
@@ -78,6 +78,8 @@ Exit gate:
 
 ## Phase 3 — Hybrid retrieval + first Ask/Trace
 
+**Status: Complete — 2026-09-18**
+
 **Goal:** create the first complete RAG loop while keeping every stage visible.
 
 Deliverables:
@@ -104,6 +106,8 @@ Exit gate:
 ---
 
 ## Phase 4 — Evidence reconciliation + time + graph
+
+**Status: Complete — 2026-09-18**
 
 **Goal:** make Witness meaningfully different from ordinary RAG demos.
 
