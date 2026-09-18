@@ -178,6 +178,10 @@ def test_lab_compares_all_retrieval_modes_and_exports_json_csv(tmp_path):
             item["kind"] == "objective"
             for item in comparison["metrics"]
         )
+        assert any(
+            item["metric"] == "mean_latency_ms"
+            for item in comparison["metrics"]
+        )
         assert comparison["model_judged_metrics"] == []
 
         json_path = export_run(
