@@ -17,6 +17,9 @@ embeddings = [
 vision = [
   "open-clip-torch>=3.3,<4",
 ]
+build = [
+  "pyinstaller>=6.10,<7",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

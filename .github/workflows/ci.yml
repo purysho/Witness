@@ -63,3 +63,31 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Check Tauri host
         run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml
+
+  packaged-sidecar-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install frozen-engine tooling
+        run: python -m pip install --upgrade pip -e "engine[build]"
+      - name: Build frozen Witness engine
+        run: python tools/build-sidecar.py
+      - name: Smoke frozen engine and persistence
+        shell: pwsh
+        run: |
+          $sidecar = Get-ChildItem "apps/desktop/src-tauri/binaries/witness-engine-*.exe" | Select-Object -First 1
+          if (-not $sidecar) { throw "Frozen Witness engine was not created" }
+          python tools/smoke-sidecar.py --engine $sidecar.FullName
+      - name: Install desktop dependencies
+        working-directory: apps/desktop
+        run: npm install --no-audit --no-fund
+      - name: Build release host with bundled sidecar config
+        working-directory: apps/desktop
+        run: npm run tauri build -- --config src-tauri/tauri.release.conf.json --no-bundle
