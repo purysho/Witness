@@ -2,6 +2,8 @@
 
 The build order is deliberately evidence-first. We will not start with a polished chat UI and retrofit provenance later.
 
+**Implementation status (2026-09-18):** the engine-side hybrid/specialized retrieval, reconciliation, sufficiency, context-pack, structured answer validation, and append-only Ask/Trace loop are implemented. The Phase 3/4 desktop UI exit gates remain open, so these phases are not yet declared complete.
+
 ## Phase 0 — Specification and contracts
 
 **Goal:** freeze the system boundaries before implementation.
