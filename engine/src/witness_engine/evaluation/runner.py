@@ -283,6 +283,7 @@ class EvalRunner:
                     latency_ms=latency_ms,
                     cost_usd=cost_usd,
                     cost_available=cost_available,
+                    top_k=config.top_k,
                 )
                 result = EvalCaseResult(
                     case_id=case.case_id,
