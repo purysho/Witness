@@ -62,4 +62,4 @@ Witness is an **evidence and retrieval workbench**, not a general-purpose autono
 
 ## Status
 
-**Phases 3, 4, and 5 complete; Phase 6 is in progress.** Witness now has functional Library, Ask, Trace, Graph, Lab, and an active Attack Lab surface. Attack experiments clone the corpus transactionally, ingest adversarial evidence only into the clone, run clean-vs-attacked benchmarks through the production Ask pipeline, preserve both traces, assert isolation/configuration invariants, and export JSON/CSV. Multimodal evidence and release hardening remain.
+**Phases 3, 4, 5, and 6 complete.** Witness now has functional Library, Ask, Trace, Graph, Lab, and Attack desktop surfaces. Attack experiments clone the corpus transactionally, ingest adversarial evidence only into the clone, run reproducible clean-vs-attacked benchmarks through the production Ask pipeline, preserve both traces, assert isolation/configuration/citation invariants, expose retrieval and answer diffs, and export JSON/CSV. Multimodal evidence and release hardening remain.

@@ -1,5 +1,7 @@
 # Witness Attack Lab
 
+**Phase 6 status: Complete — 2026-09-18**
+
 Attack Lab measures how the production Witness pipeline changes when adversarial evidence is introduced into an isolated clone of a canonical corpus.
 
 ## Isolation boundary

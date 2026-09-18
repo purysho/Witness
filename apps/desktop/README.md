@@ -1,6 +1,6 @@
 # Witness desktop
 
-The desktop shell is a functional Tauri 2 + React/TypeScript client for the evidence engine through Phase 5, with Phase 6 Attack Lab in active validation.
+The desktop shell is a functional Tauri 2 + React/TypeScript client for the evidence engine through Phase 6.
 
 Implemented surfaces:
 
