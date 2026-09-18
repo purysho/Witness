@@ -7,6 +7,7 @@ from .models import (
     VisualModality,
     VisualRetrievalCandidate,
 )
+from .pdf import PdfVisualExtractionResult, index_pdf_visual_evidence
 from .providers import (
     DeterministicHashVisualEmbeddingProvider,
     VisualEmbeddingProvider,
@@ -17,9 +18,11 @@ __all__ = [
     "DeterministicHashVisualEmbeddingProvider",
     "LocalVisualVectorIndex",
     "NormalizedRegion",
+    "PdfVisualExtractionResult",
     "VisualEmbeddingProvider",
     "VisualEvidence",
     "VisualEvidenceStore",
     "VisualModality",
     "VisualRetrievalCandidate",
+    "index_pdf_visual_evidence",
 ]

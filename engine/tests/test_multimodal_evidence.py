@@ -3,6 +3,8 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
+from PIL import Image
+
 from witness_engine.multimodal import (
     DeterministicHashVisualEmbeddingProvider,
     LocalVisualVectorIndex,
@@ -10,6 +12,7 @@ from witness_engine.multimodal import (
     VisualEvidence,
     VisualEvidenceStore,
     VisualModality,
+    index_pdf_visual_evidence,
 )
 from witness_engine.pipeline import index_document
 from witness_engine.retrieval import LocalEvidenceIndex
@@ -204,3 +207,32 @@ def test_visual_vector_index_is_deterministic_and_persistent(tmp_path):
             item.visual_evidence_id
             for item in first_results
         ]
+
+
+def test_pdf_image_extraction_preserves_page_region(tmp_path):
+    image_path = tmp_path / "source-image.png"
+    pdf_path = tmp_path / "visual-report.pdf"
+
+    image = Image.new("RGB", (240, 120), (245, 245, 245))
+    image.save(image_path, format="PNG")
+    image.save(pdf_path, format="PDF", resolution=72.0)
+
+    database = tmp_path / "witness.sqlite3"
+    with LocalEvidenceIndex(database) as lexical:
+        indexed = index_document(pdf_path, lexical)
+        result = index_pdf_visual_evidence(
+            pdf_path,
+            indexed.source_version_id,
+            lexical,
+        )
+
+        assert result.evidence
+        item = result.evidence[0]
+        assert item.source_version_id == indexed.source_version_id
+        assert item.page_number == 1
+        assert item.locator.startswith("page:1#region:")
+        assert 0.0 <= item.region.x0 < item.region.x1 <= 1.0
+        assert 0.0 <= item.region.y0 < item.region.y1 <= 1.0
+        assert VisualEvidenceStore(lexical).asset_bytes(
+            item.asset_sha256
+        )

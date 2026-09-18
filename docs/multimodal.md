@@ -44,3 +44,16 @@ Visual bytes are deduplicated by SHA-256. Multiple evidence regions may referenc
 The deterministic hash provider exists only to test persistence, exact-vector search, ranking, and Trace plumbing offline. It is not presented as a semantic vision model. Production CLIP/SigLIP-style providers can implement the same interface later.
 
 The initial `LocalVisualVectorIndex` uses exact cosine search, matching Witness's evidence-first policy of establishing measurable behavior before ANN optimization.
+
+
+## PDF embedded-image extraction
+
+The first concrete extractor uses pypdf's displayed image objects and the current content-stream transformation matrix. For a top-level image `Do` operation, Witness maps the image-space unit square through the six-value PDF CTM, clips it to the page crop box, converts PDF bottom-left coordinates to normalized top-left coordinates, and persists the resulting exact page region.
+
+The adapter deliberately fails closed for cases it cannot yet locate reproducibly:
+
+- visually rotated pages are skipped with a diagnostic;
+- Form XObjects whose nested transform cannot yet be composed are not assigned guessed regions;
+- broken/empty image payloads become warnings rather than evidence.
+
+Pillow is a core Phase 7 dependency because pypdf requires it for image extraction. OCR is still not performed by this layer.
