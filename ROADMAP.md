@@ -2,7 +2,7 @@
 
 The build order is deliberately evidence-first. We will not start with a polished chat UI and retrofit provenance later.
 
-**Implementation status (2026-09-18): Phases 3, 4, 5, and 6 complete; Phase 7 in progress.** Witness now has hybrid/specialized retrieval, evidence reconciliation/time/graph behavior, functional Ask/Trace/Graph/Lab/Attack surfaces, reproducible RAG evaluation, isolated adversarial testing, and the first provenance-safe multimodal evidence foundation. Release hardening remains.
+**Implementation status (2026-09-18): Phases 3, 4, 5, 6, and 7 complete; Phase 8 next.** Witness now has hybrid/specialized retrieval, evidence reconciliation/time/graph behavior, functional Ask/Trace/Graph/Lab/Attack surfaces, reproducible RAG evaluation, isolated adversarial testing, and provenance-safe multimodal evidence with routed retrieval, citations, visual inspection, and objective Lab coverage. Release hardening remains.
 
 ## Phase 0 — Specification and contracts
 
@@ -183,6 +183,8 @@ Exit gate:
 ---
 
 ## Phase 7 — Multimodal evidence
+
+**Status: Complete — 2026-09-18**
 
 **Goal:** extend the same evidence model to information that text flattening loses.
 

@@ -63,4 +63,4 @@ Witness is an **evidence and retrieval workbench**, not a general-purpose autono
 
 ## Status
 
-**Phases 3, 4, 5, and 6 complete; Phase 7 is in final validation.** Witness now has functional Library, Ask, Trace, Graph, Lab, and Attack surfaces plus provenance-safe multimodal evidence: PDF image-region extraction, visual routing, multimodal citations and Trace, RAG Lab visual-gold evaluation, and a cited visual evidence viewer. Semantic visual search is provider-explicit; release hardening remains Phase 8 work.
+**Phases 3, 4, 5, 6, and 7 complete; Phase 8 is next.** Witness now has functional Library, Ask, Trace, Graph, Lab, and Attack surfaces plus provenance-safe multimodal evidence: PDF image-region extraction, visual routing, multimodal citations and Trace, RAG Lab visual-gold evaluation, and a cited visual evidence viewer. Semantic visual search is provider-explicit; release hardening remains Phase 8 work.
