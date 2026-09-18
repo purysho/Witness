@@ -43,6 +43,13 @@ jobs:
         working-directory: apps/desktop
         run: npm run tauri build -- --config src-tauri/tauri.release.conf.json
 
+      - name: Smoke installed Windows package
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem "apps/desktop/src-tauri/target/release/bundle/nsis/*.exe" | Select-Object -First 1
+          if (-not $installer) { throw "NSIS installer was not created" }
+          ./tools/smoke-installed.ps1 -Installer $installer.FullName
+
       - name: Generate SHA-256 checksums
         shell: pwsh
         run: |
