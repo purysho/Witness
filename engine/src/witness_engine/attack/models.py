@@ -139,6 +139,11 @@ class AttackCaseComparison(BaseModel):
     recall_delta: float | None = None
     precision_delta: float | None = None
     citation_coverage_delta: float | None = None
+    added_evidence_count: int = 0
+    removed_evidence_count: int = 0
+    rank_changed_count: int = 0
+    clean_answer_text: str = ""
+    attacked_answer_text: str = ""
 
 
 class AttackRunSummary(BaseModel):

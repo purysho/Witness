@@ -69,6 +69,25 @@ def _citations_resolve_to_context(case) -> bool | None:
     )
 
 
+def _retrieval_ranks(case) -> dict[str, int]:
+    payload = case.ask_result or {}
+    retrieval = payload.get("retrieval", {}) if isinstance(payload, dict) else {}
+    candidates = (
+        retrieval.get("candidates", [])
+        if isinstance(retrieval, dict)
+        else []
+    )
+    values: dict[str, int] = {}
+    for item in candidates:
+        if not isinstance(item, dict):
+            continue
+        chunk_id = item.get("chunk_id")
+        rank = item.get("rank")
+        if isinstance(chunk_id, str) and isinstance(rank, int):
+            values[chunk_id] = rank
+    return values
+
+
 def _case_map(result):
     return {case.case_id: case for case in result.cases}
 
@@ -317,6 +336,10 @@ class AttackRunner:
             for case in dataset.cases:
                 clean_case = clean_cases[case.case_id]
                 attacked_case = attacked_cases[case.case_id]
+                clean_ranks = _retrieval_ranks(clean_case)
+                attacked_ranks = _retrieval_ranks(attacked_case)
+                clean_ids = set(clean_ranks)
+                attacked_ids = set(attacked_ranks)
                 cases.append(
                     AttackCaseComparison(
                         case_id=case.case_id,
@@ -339,6 +362,15 @@ class AttackRunner:
                             attacked_case.metrics.citation_coverage,
                             clean_case.metrics.citation_coverage,
                         ),
+                        added_evidence_count=len(attacked_ids - clean_ids),
+                        removed_evidence_count=len(clean_ids - attacked_ids),
+                        rank_changed_count=sum(
+                            1
+                            for chunk_id in clean_ids & attacked_ids
+                            if clean_ranks[chunk_id] != attacked_ranks[chunk_id]
+                        ),
+                        clean_answer_text=_answer_text(clean_case),
+                        attacked_answer_text=_answer_text(attacked_case),
                     )
                 )
 

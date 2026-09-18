@@ -251,6 +251,19 @@ export function AttackView({
                     <span>{"Δ recall " + delta(item.recall_delta)}</span>
                     <span>{"Δ precision " + delta(item.precision_delta)}</span>
                     <span>{"Δ citations " + delta(item.citation_coverage_delta)}</span>
+                    <span>{"evidence +" + item.added_evidence_count}</span>
+                    <span>{"evidence −" + item.removed_evidence_count}</span>
+                    <span>{"rank moved " + item.rank_changed_count}</span>
+                  </div>
+                  <div className="attack-answer-diff">
+                    <div>
+                      <strong>Clean answer</strong>
+                      <p>{item.clean_answer_text || "No answer text."}</p>
+                    </div>
+                    <div>
+                      <strong>Attacked answer</strong>
+                      <p>{item.attacked_answer_text || "No answer text."}</p>
+                    </div>
                   </div>
                   <div className="lab-case-actions">
                     {item.clean_query_run_id && (

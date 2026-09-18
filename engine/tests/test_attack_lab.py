@@ -133,6 +133,17 @@ def test_attack_run_isolated_and_persisted(tmp_path):
         assert result.run.attacked_corpus_fingerprint != before
         assert result.invariants[0].status.value == "PASS"
         assert result.run.snapshot_path
+        assert result.cases[0].clean_answer_text
+        assert result.cases[0].attacked_answer_text
+        assert result.cases[0].added_evidence_count >= 0
+        assert result.cases[0].removed_evidence_count >= 0
+        assert result.cases[0].rank_changed_count >= 0
+        pipeline_invariant = next(
+            item
+            for item in result.invariants
+            if item.kind == "pipeline_configuration_unchanged"
+        )
+        assert pipeline_invariant.status.value == "PASS"
         assert store.load_run(result.run.attack_run_id).run.attack_id == "duplicate-poison"
         assert store.list_runs()
     finally:
