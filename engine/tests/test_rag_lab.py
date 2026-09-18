@@ -137,7 +137,7 @@ def test_lab_runner_persists_metrics_and_case_trace_links(tmp_path):
         assert persisted[0].metrics is not None
 
 
-def test_lab_compares_retrieval_modes_and_exports_json_csv(tmp_path):
+def test_lab_compares_all_retrieval_modes_and_exports_json_csv(tmp_path):
     _database, provider, lexical, vectors = _build_workspace(tmp_path)
     try:
         store = EvalStore(lexical)
@@ -148,23 +148,25 @@ def test_lab_compares_retrieval_modes_and_exports_json_csv(tmp_path):
             store=store,
         )
         dataset = _dataset()
-        lexical_run = runner.run(
-            dataset,
-            EvalConfig(
-                name="Lexical",
-                retrieval_mode=RetrievalMode.LEXICAL,
-                top_k=5,
-            ),
-        )
-        routed_run = runner.run(
-            dataset,
-            EvalConfig(
-                name="Routed",
-                retrieval_mode=RetrievalMode.ROUTED,
-                top_k=5,
-            ),
-        )
+        mode_runs = {}
+        for mode in (
+            RetrievalMode.LEXICAL,
+            RetrievalMode.DENSE,
+            RetrievalMode.HYBRID,
+            RetrievalMode.ROUTED,
+        ):
+            mode_runs[mode] = runner.run(
+                dataset,
+                EvalConfig(
+                    name=mode.value,
+                    retrieval_mode=mode,
+                    top_k=5,
+                ),
+            )
+            assert mode_runs[mode].run.config.retrieval_mode == mode
 
+        lexical_run = mode_runs[RetrievalMode.LEXICAL]
+        routed_run = mode_runs[RetrievalMode.ROUTED]
         comparison = compare_runs(
             store,
             lexical_run.run.run_id,
