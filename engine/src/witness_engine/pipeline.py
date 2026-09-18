@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .answering.ask import AskEngine, AskResult
+from .answering.providers import GenerationProvider
 from .chunking import chunk_block
 from .ids import file_sha256, stable_id
 from .ingestion.registry import extract_document
@@ -193,6 +195,41 @@ def search_routed_evidence(
         reranker=reranker,
     ).search(
         query,
+        limit=limit,
+        candidate_pool=candidate_pool,
+        rerank_pool=rerank_pool,
+        rrf_k=rrf_k,
+    )
+
+
+def ask_evidence(
+    question: str,
+    lexical_index: LocalEvidenceIndex,
+    vector_index: LocalVectorIndex,
+    embedding_provider: EmbeddingProvider,
+    *,
+    limit: int = 10,
+    candidate_pool: int = 30,
+    rerank_pool: int = 20,
+    rrf_k: int = 60,
+    router: TransparentRetrievalRouter | None = None,
+    reranker: RerankProvider | None = None,
+    generator: GenerationProvider | None = None,
+) -> AskResult:
+    """Run the complete evidence-first Ask loop and persist its Trace."""
+
+    retriever = RoutedRetriever(
+        lexical_index,
+        vector_index,
+        embedding_provider,
+        router=router,
+        reranker=reranker,
+    )
+    return AskEngine(
+        retriever,
+        generator=generator,
+    ).ask(
+        question,
         limit=limit,
         candidate_pool=candidate_pool,
         rerank_pool=rerank_pool,
