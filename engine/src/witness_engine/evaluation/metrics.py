@@ -60,12 +60,18 @@ def _candidate_relevance(
     return int(any(evidence_matches(ref, candidate) for ref in refs))
 
 
-def _ndcg(relevance: list[int], gold_count: int) -> float:
+def _ndcg(relevance: list[int], gold_count: int, k: int) -> float:
     if gold_count <= 0:
         return 1.0
-    dcg = sum(rel / log2(rank + 1) for rank, rel in enumerate(relevance, start=1))
-    ideal_relevant = min(gold_count, len(relevance))
-    idcg = sum(1.0 / log2(rank + 1) for rank in range(1, ideal_relevant + 1))
+    dcg = sum(
+        rel / log2(rank + 1)
+        for rank, rel in enumerate(relevance[:k], start=1)
+    )
+    ideal_relevant = min(gold_count, k)
+    idcg = sum(
+        1.0 / log2(rank + 1)
+        for rank in range(1, ideal_relevant + 1)
+    )
     return float(dcg / idcg) if idcg else 0.0
 
 
@@ -77,6 +83,7 @@ def score_case(
     latency_ms: float,
     cost_usd: float | None,
     cost_available: bool,
+    top_k: int,
 ) -> EvalCaseMetrics:
     candidate_meta = [
         CandidateMeta(
@@ -93,12 +100,12 @@ def score_case(
         matched = _match_gold_indices(gold, candidate_meta)
         relevance = [_candidate_relevance(gold, item) for item in candidate_meta]
         recall = len(matched) / len(gold)
-        precision = sum(relevance) / len(relevance) if relevance else 0.0
+        precision = sum(relevance[:top_k]) / top_k
         reciprocal_rank = next(
             (1.0 / rank for rank, rel in enumerate(relevance, start=1) if rel),
             0.0,
         )
-        ndcg = _ndcg(relevance, len(gold))
+        ndcg = _ndcg(relevance, len(gold), top_k)
     else:
         matched = set()
         recall = precision = reciprocal_rank = ndcg = None
