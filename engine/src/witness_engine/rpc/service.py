@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from ..answering import LocalRunStore
-from ..graph import build_graph_snapshot
+from ..graph.view import build_graph_snapshot
 from ..pipeline import ask_evidence, index_document
 from ..retrieval import DeterministicHashEmbeddingProvider, LocalEvidenceGraph, LocalEvidenceIndex, LocalHierarchyIndex, LocalTemporalIndex, LocalVectorIndex
 
