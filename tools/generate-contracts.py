@@ -26,7 +26,7 @@ export interface SourceVersionSummary { source_version_id:string; logical_source
 export interface ContextEvidence { evidence_id:string; chunk_id:string; text:string; source_version_id:string; locator:string|null; method:string; rank:number; }
 export interface Citation { evidence_id:string; chunk_id:string; source_version_id:string; locator:string|null; }
 export interface AnswerSentence { text:string; evidence_ids:string[]; }
-export interface TraceEvent { run_id:string; sequence:number; stage:string; payload:Record<string,unknown>; created_at:string; }
+export interface TraceEvent { event_id:string; run_id:string; sequence:number; schema_version:number; stage:string; payload:Record<string,unknown>; created_at:string; }
 export interface AskResult {
   run_id:string;
   answer:{state:SufficiencyState;sentences:AnswerSentence[];citations:Citation[]};
