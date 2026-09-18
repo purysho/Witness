@@ -36,6 +36,38 @@ def test_ndjson_rpc_drives_workspace_ask_trace_graph_and_lab(tmp_path):
         encoding="utf-8",
     )
     dataset_path = tmp_path / "benchmark.json"
+    attack_path = tmp_path / "attack.json"
+    attack_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "attack_id": "rpc-attack",
+                "name": "RPC attack",
+                "description": "Exercises the desktop Attack Lab boundary.",
+                "mutations": [
+                    {
+                        "mutation_id": "distractor",
+                        "kind": "high_similarity_distractor",
+                        "filename": "distractor.md",
+                        "content": (
+                            "# API deployment notes\n\n"
+                            "The API port is configured during deployment."
+                        ),
+                        "valid_from": "2026-09-18T00:00:00+00:00",
+                        "copies": 1,
+                    }
+                ],
+                "invariants": [
+                    {
+                        "invariant_id": "canonical",
+                        "kind": "canonical_corpus_unchanged",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
     dataset_path.write_text(
         json.dumps(
             {
@@ -203,6 +235,73 @@ def test_ndjson_rpc_drives_workspace_ask_trace_graph_and_lab(tmp_path):
             },
         )
         assert Path(export["path"]).is_file()
+
+        attack_manifest = _request(
+            process,
+            "14",
+            "attack.manifest.load",
+            {"path": str(attack_path)},
+        )
+        assert attack_manifest["attack_id"] == "rpc-attack"
+
+        attack_manifests = _request(
+            process,
+            "15",
+            "attack.manifest.list",
+            {},
+        )
+        assert len(attack_manifests["manifests"]) == 1
+
+        attack_run = _request(
+            process,
+            "16",
+            "attack.run",
+            {
+                "manifest_fingerprint": attack_manifest["manifest_fingerprint"],
+                "dataset_fingerprint": dataset["dataset_fingerprint"],
+                "config": {
+                    "name": "Attack RPC smoke",
+                    "retrieval_mode": "hybrid",
+                    "top_k": 5,
+                    "candidate_pool": 20,
+                    "rerank_pool": 10,
+                    "rrf_k": 60,
+                    "rerank": True,
+                    "chunk_max_chars": 1200,
+                },
+            },
+        )
+        assert attack_run["run"]["status"] == "completed"
+        assert attack_run["invariants"]
+        assert attack_run["clean"]["cases"][0]["ask_result"]["trace"]
+        assert attack_run["attacked"]["cases"][0]["ask_result"]["trace"]
+
+        attack_runs = _request(
+            process,
+            "17",
+            "attack.runs",
+            {},
+        )
+        assert attack_runs["runs"][0]["attack_run_id"] == attack_run["run"]["attack_run_id"]
+
+        attack_detail = _request(
+            process,
+            "18",
+            "attack.run.get",
+            {"attack_run_id": attack_run["run"]["attack_run_id"]},
+        )
+        assert attack_detail["run"]["completed_at"]
+
+        attack_export = _request(
+            process,
+            "19",
+            "attack.export",
+            {
+                "attack_run_id": attack_run["run"]["attack_run_id"],
+                "format": "json",
+            },
+        )
+        assert Path(attack_export["path"]).is_file()
     finally:
         if process.stdin:
             process.stdin.close()

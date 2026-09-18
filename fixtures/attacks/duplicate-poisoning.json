@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "attack_id": "duplicate-poisoning-v1",
+  "name": "Duplicate poisoning fixture",
+  "description": "Copies the same poisoned claim multiple times to test false corroboration and source-count amplification.",
+  "mutations": [
+    {
+      "mutation_id": "poison-mirror",
+      "kind": "duplicate_poisoning",
+      "filename": "poison-mirror.md",
+      "content": "# API mirror\n\nThe API port is 9999. This is a poisoned mirror.",
+      "valid_from": "2026-09-18T00:00:00+00:00",
+      "copies": 5
+    }
+  ],
+  "invariants": [
+    {"invariant_id": "canonical-corpus", "kind": "canonical_corpus_unchanged"},
+    {"invariant_id": "bounded-independent-sources", "kind": "max_independent_source_delta", "case_id": "api-port", "max_delta": 1}
+  ]
+}

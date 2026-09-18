@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "attack_id": "altered-near-duplicate-v1",
+  "name": "Altered near-duplicate fixture",
+  "description": "Changes a small but material value inside text shaped like the original evidence.",
+  "mutations": [
+    {
+      "mutation_id": "near-duplicate-api",
+      "kind": "altered_near_duplicate",
+      "filename": "api-reference-copy.md",
+      "content": "# API\n\nThe API port is 5201.",
+      "valid_from": "2026-09-18T00:00:00+00:00",
+      "copies": 1
+    }
+  ],
+  "invariants": [
+    {"invariant_id": "canonical-corpus", "kind": "canonical_corpus_unchanged"},
+    {"invariant_id": "alteration-visible", "kind": "expected_state", "case_id": "api-port", "expected_state": "CONFLICTED"}
+  ]
+}

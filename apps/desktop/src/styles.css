@@ -47,3 +47,34 @@ select:focus{border-color:var(--gold-soft)}
 .lab-history-compare{margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .lab-history-compare span{color:var(--muted);font-size:9px;font-family:"SFMono-Regular",Consolas,monospace}
 .lab-history-compare button{grid-column:1/-1}
+
+
+.attack-answer-diff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+.attack-answer-diff > div {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px;
+  min-width: 0;
+}
+.attack-answer-diff strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.attack-answer-diff p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .attack-answer-diff {
+    grid-template-columns: 1fr;
+  }
+}

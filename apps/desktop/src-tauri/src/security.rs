@@ -9,7 +9,7 @@ pub fn validate_request(request: &Value) -> Result<(), String> {
         return Err(format!("Unsupported RPC protocol version: {version}"));
     }
     let method = object.get("method").and_then(Value::as_str).ok_or_else(|| "RPC request is missing method".to_string())?;
-    const ALLOWED: &[&str] = &["ping","workspace.open","source.import","source.list","query.run","query.trace","graph.snapshot","lab.dataset.load","lab.dataset.list","lab.run","lab.runs","lab.run.get","lab.case","lab.compare","lab.export"];
+    const ALLOWED: &[&str] = &["ping","workspace.open","source.import","source.list","query.run","query.trace","graph.snapshot","lab.dataset.load","lab.dataset.list","lab.run","lab.runs","lab.run.get","lab.case","lab.compare","lab.export","attack.manifest.load","attack.manifest.list","attack.run","attack.runs","attack.run.get","attack.export"];
     if !ALLOWED.contains(&method) {
         return Err(format!("RPC method is not allowlisted: {method}"));
     }

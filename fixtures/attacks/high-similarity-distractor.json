@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "attack_id": "high-similarity-distractor-v1",
+  "name": "High-similarity distractor fixture",
+  "description": "Adds query-shaped text that discusses the target without containing the gold fact.",
+  "mutations": [
+    {
+      "mutation_id": "api-distractor",
+      "kind": "high_similarity_distractor",
+      "filename": "api-distractor.md",
+      "content": "# API port deployment configuration\n\nThe API port is configured during deployment. API port settings are documented for operators. Deployment configuration should be reviewed before startup.",
+      "valid_from": "2026-09-18T00:00:00+00:00",
+      "copies": 1
+    }
+  ],
+  "invariants": [
+    {"invariant_id": "canonical-corpus", "kind": "canonical_corpus_unchanged"},
+    {"invariant_id": "retain-gold", "kind": "gold_recall_not_reduced", "case_id": "api-port"}
+  ]
+}

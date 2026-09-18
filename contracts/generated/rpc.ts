@@ -37,3 +37,12 @@ export interface LabMetricComparison { metric:string; a:number|null; b:number|nu
 export interface LabCaseComparison { case_id:string; question:string; a_passed:boolean; b_passed:boolean; a_state:SufficiencyState|null; b_state:SufficiencyState|null; a_query_run_id:string|null; b_query_run_id:string|null; a_failures:string[]; b_failures:string[]; }
 export interface LabComparison { dataset_fingerprint:string; dataset_id:string; dataset_name:string; run_a:EvalRunSummary; run_b:EvalRunSummary; metrics:LabMetricComparison[]; model_judged_metrics:Array<Record<string,unknown>>; cases:LabCaseComparison[]; failed_cases:LabCaseComparison[]; }
 
+export interface AttackManifestSummary { manifest_fingerprint:string; attack_id:string; name:string; description:string; mutation_count:number; registered_at?:string; }
+export interface AttackInvariantResult { invariant_id:string; kind:string; status:"PASS"|"FAIL"|"NOT_APPLICABLE"; case_id:string|null; detail:string; }
+export interface AttackCaseComparison { case_id:string; question:string; clean_state:SufficiencyState|null; attacked_state:SufficiencyState|null; clean_passed:boolean; attacked_passed:boolean; clean_query_run_id:string|null; attacked_query_run_id:string|null; recall_delta:number|null; precision_delta:number|null; citation_coverage_delta:number|null; added_evidence_count:number; removed_evidence_count:number; rank_changed_count:number; clean_answer_text:string; attacked_answer_text:string; }
+export interface AttackRunSummary { attack_run_id:string; attack_manifest_fingerprint:string; attack_id:string; attack_name:string; dataset_fingerprint:string; config:EvalConfigInput; canonical_corpus_fingerprint:string; attacked_corpus_fingerprint:string; snapshot_id:string; snapshot_path:string; status:string; started_at:string; completed_at:string|null; }
+export interface AttackEvalCaseResult extends Omit<LabCaseDetail,"has_trace"> {}
+export interface AttackEvalRunResult { run:EvalRunSummary; cases:AttackEvalCaseResult[]; }
+export interface AttackRunResult { run:AttackRunSummary; clean:AttackEvalRunResult; attacked:AttackEvalRunResult; cases:AttackCaseComparison[]; invariants:AttackInvariantResult[]; }
+export interface AttackRunListItem { attack_run_id:string; manifest_fingerprint:string; attack_id:string; attack_name:string; dataset_fingerprint:string; canonical_corpus_fingerprint:string; attacked_corpus_fingerprint:string; snapshot_id:string; snapshot_path:string; status:string; started_at:string; completed_at:string|null; }
+

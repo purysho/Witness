@@ -9,6 +9,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from ..attack import AttackManifest, AttackRunner, AttackStore, export_attack_run
 from ..answering import LocalRunStore
 from ..evaluation import (
     EvalConfig,
@@ -46,6 +47,12 @@ ALLOWED_METHODS = frozenset(
         "lab.case",
         "lab.compare",
         "lab.export",
+        "attack.manifest.load",
+        "attack.manifest.list",
+        "attack.run",
+        "attack.runs",
+        "attack.run.get",
+        "attack.export",
     }
 )
 
@@ -99,6 +106,10 @@ class RpcService:
         lexical, _ = self._require_workspace()
         return EvalStore(lexical)
 
+    def _attack_store(self) -> AttackStore:
+        lexical, _ = self._require_workspace()
+        return AttackStore(lexical)
+
     def _open_workspace(
         self,
         params: dict[str, Any],
@@ -126,6 +137,7 @@ class RpcService:
         LocalEvidenceGraph(self.lexical)
         LocalRunStore(self.lexical)
         EvalStore(self.lexical)
+        AttackStore(self.lexical)
         return {
             "path": str(path),
             "database": str(database),
@@ -350,6 +362,77 @@ class RpcService:
             "format": format_value,
         }
 
+    def _attack_manifest_load(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        raw_path = str(params.get("path", "")).strip()
+        if not raw_path:
+            raise RpcServiceError(
+                "invalid_params",
+                "attack.manifest.load requires a manifest JSON path",
+            )
+        path = Path(raw_path).expanduser().resolve()
+        try:
+            manifest = AttackManifest.model_validate_json(
+                path.read_text(encoding="utf-8")
+            )
+        except (OSError, ValidationError, ValueError) as exc:
+            raise RpcServiceError(
+                "invalid_attack_manifest",
+                str(exc),
+            ) from exc
+        store = self._attack_store()
+        store.register_manifest(manifest)
+        return {
+            "manifest_fingerprint": manifest.fingerprint,
+            "attack_id": manifest.attack_id,
+            "name": manifest.name,
+            "description": manifest.description,
+            "mutation_count": len(manifest.mutations),
+        }
+
+    def _attack_run(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        lexical, vectors = self._require_workspace()
+        assert self.workspace_path is not None
+        manifest_fingerprint = str(
+            params.get("manifest_fingerprint", "")
+        ).strip()
+        dataset_fingerprint = str(
+            params.get("dataset_fingerprint", "")
+        ).strip()
+        if not manifest_fingerprint or not dataset_fingerprint:
+            raise RpcServiceError(
+                "invalid_params",
+                "attack.run requires manifest_fingerprint and dataset_fingerprint",
+            )
+        try:
+            manifest = self._attack_store().load_manifest(
+                manifest_fingerprint
+            )
+            dataset = self._lab_store().load_dataset(
+                dataset_fingerprint
+            )
+            config = EvalConfig.model_validate(
+                params.get("config", {})
+            )
+            result = AttackRunner(
+                lexical,
+                vectors,
+                self.embedding_provider,
+                workspace_path=self.workspace_path,
+                store=self._attack_store(),
+            ).run(manifest, dataset, config)
+        except (KeyError, ValidationError, ValueError, OSError) as exc:
+            raise RpcServiceError(
+                "attack_run_failed",
+                str(exc),
+            ) from exc
+        return result.model_dump(mode="json")
+
     def handle(
         self,
         method: str,
@@ -486,5 +569,65 @@ class RpcService:
                 ) from exc
         if method == "lab.export":
             return self._lab_export(params)
+        if method == "attack.manifest.load":
+            return self._attack_manifest_load(params)
+        if method == "attack.manifest.list":
+            return {
+                "manifests": list(self._attack_store().list_manifests())
+            }
+        if method == "attack.run":
+            return self._attack_run(params)
+        if method == "attack.runs":
+            limit = min(max(int(params.get("limit", 50)), 1), 500)
+            return {
+                "runs": list(self._attack_store().list_runs(limit=limit))
+            }
+        if method == "attack.run.get":
+            run_id = str(params.get("attack_run_id", "")).strip()
+            if not run_id:
+                raise RpcServiceError(
+                    "invalid_params",
+                    "attack.run.get requires attack_run_id",
+                )
+            try:
+                result = self._attack_store().load_run(run_id)
+            except KeyError as exc:
+                raise RpcServiceError(
+                    "attack_run_not_found",
+                    str(exc),
+                ) from exc
+            return result.model_dump(mode="json")
+        if method == "attack.export":
+            assert self.workspace_path is not None
+            run_id = str(params.get("attack_run_id", "")).strip()
+            format_value = str(params.get("format", "json")).strip().casefold()
+            if not run_id:
+                raise RpcServiceError(
+                    "invalid_params",
+                    "attack.export requires attack_run_id",
+                )
+            requested = str(params.get("path", "")).strip()
+            output = (
+                Path(requested).expanduser().resolve()
+                if requested
+                else (
+                    self.workspace_path
+                    / "exports"
+                    / f"attack-{run_id[:12]}.{format_value}"
+                )
+            )
+            try:
+                path = export_attack_run(
+                    self._attack_store(),
+                    run_id,
+                    output,
+                    format=format_value,
+                )
+            except (KeyError, ValueError) as exc:
+                raise RpcServiceError(
+                    "attack_export_failed",
+                    str(exc),
+                ) from exc
+            return {"path": str(path), "format": format_value}
 
         raise AssertionError(method)

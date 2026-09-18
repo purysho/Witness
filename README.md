@@ -58,7 +58,8 @@ Witness is an **evidence and retrieval workbench**, not a general-purpose autono
 - [`ROADMAP.md`](ROADMAP.md) — staged implementation plan
 - [`SECURITY.md`](SECURITY.md) — threat model and source-safety rules
 - [`docs/evaluation.md`](docs/evaluation.md) — RAG Lab datasets, metrics, snapshots, comparison, and export semantics
+- [`docs/attack-lab.md`](docs/attack-lab.md) — Attack Lab isolation, manifests, invariants, reproducibility, and export
 
 ## Status
 
-**Phases 3, 4, and 5 complete.** Witness now has functional Library, Ask, Trace, Graph, and Lab desktop surfaces. Lab runs the same evidence pipeline under reproducible lexical, dense, hybrid, or routed configurations, persists configuration/corpus snapshots and per-case traces, compares objective retrieval/grounding metrics A/B, and exports JSON/CSV. Attack Lab, multimodal evidence, and release hardening remain.
+**Phases 3, 4, 5, and 6 complete.** Witness now has functional Library, Ask, Trace, Graph, Lab, and Attack desktop surfaces. Attack experiments clone the corpus transactionally, ingest adversarial evidence only into the clone, run reproducible clean-vs-attacked benchmarks through the production Ask pipeline, preserve both traces, assert isolation/configuration/citation invariants, expose retrieval and answer diffs, and export JSON/CSV. Multimodal evidence and release hardening remain.
