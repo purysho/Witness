@@ -20,6 +20,7 @@ from witness_engine.retrieval import (
     LocalEvidenceIndex,
     LocalVectorIndex,
 )
+from witness_engine.rpc.service import RpcService
 
 
 def _source(tmp_path, lexical: LocalEvidenceIndex) -> str:
@@ -337,3 +338,35 @@ def test_visual_route_reaches_context_citation_and_trace(tmp_path):
             event.stage == "retrieval.visual.completed"
             for event in result.trace
         )
+
+
+
+def test_visual_preview_rpc_returns_region_and_bounded_preview(tmp_path):
+    workspace = tmp_path / "workspace"
+    pdf_path = tmp_path / "preview.pdf"
+    image = Image.new("RGB", (120, 60), (210, 210, 210))
+    image.save(pdf_path, format="PDF", resolution=72.0)
+
+    service = RpcService()
+    try:
+        service.handle("workspace.open", {"path": str(workspace)})
+        imported = service.handle(
+            "source.import",
+            {"path": str(pdf_path)},
+        )
+        assert imported["visual_evidence_count"] >= 1
+        assert service.lexical is not None
+        evidence = VisualEvidenceStore(service.lexical).list()[0]
+
+        preview = service.handle(
+            "visual.evidence.get",
+            {"visual_evidence_id": evidence.visual_evidence_id},
+        )
+
+        assert preview["evidence"]["visual_evidence_id"] == evidence.visual_evidence_id
+        assert preview["evidence"]["locator"] == evidence.locator
+        assert preview["preview_data_url"].startswith("data:image/jpeg;base64,")
+        assert preview["preview_warning"] is None
+        assert len(preview["preview_data_url"]) < 1_000_000
+    finally:
+        service.close()

@@ -75,3 +75,12 @@ When configured, visual results are converted into the shared retrieval-candidat
 Visual candidates then participate in the same RRF and reranking stages as textual evidence. Fusion and reranking preserve the modality fields rather than flattening them away. ContextPack and validated citations also retain the visual evidence ID and modality.
 
 Ask Trace includes a dedicated `retrieval.visual.completed` event with the visual provider identity and candidate list. This makes the route that caused a page region to reach the answer directly inspectable.
+
+
+## Evidence viewer
+
+Cited visual evidence can be opened directly from Ask or Trace. The desktop requests the immutable visual evidence record by ID and receives a bounded derived JPEG preview plus the original provenance metadata.
+
+The viewer displays the extracted asset beside a normalized source-page map. The map is deliberately schematic rather than pretending to be a PDF renderer: its highlighted box is computed directly from the stored normalized region, while the extracted source asset is shown separately. The viewer also exposes the exact locator, source-version ID, original media type, and asset SHA-256.
+
+Preview generation never changes visual evidence identity. It is a disposable presentation artifact derived from the content-addressed source asset.
