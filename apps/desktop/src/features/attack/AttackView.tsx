@@ -298,8 +298,8 @@ export function AttackView({
             runs.slice(0, 12).map((run) => (
               <article key={run.attack_run_id}>
                 <div>
-                  <strong>{run.status}</strong>
-                  <span>{run.snapshot_id.slice(0, 10)}</span>
+                  <strong>{run.attack_name}</strong>
+                  <span>{run.status + " · " + run.snapshot_id.slice(0, 10)}</span>
                 </div>
                 <code>{run.attack_run_id.slice(0, 10)}</code>
                 <small>{run.started_at}</small>

@@ -192,11 +192,23 @@ class AttackStore:
     def list_runs(self, *, limit: int = 50) -> tuple[dict, ...]:
         rows = self.connection.execute(
             """
-            SELECT attack_run_id, manifest_fingerprint, dataset_fingerprint,
-                   canonical_corpus_fingerprint, attacked_corpus_fingerprint,
-                   snapshot_id, snapshot_path, status, started_at, completed_at
-            FROM attack_runs
-            ORDER BY started_at DESC, attack_run_id DESC
+            SELECT
+                r.attack_run_id,
+                r.manifest_fingerprint,
+                m.attack_id,
+                m.name AS attack_name,
+                r.dataset_fingerprint,
+                r.canonical_corpus_fingerprint,
+                r.attacked_corpus_fingerprint,
+                r.snapshot_id,
+                r.snapshot_path,
+                r.status,
+                r.started_at,
+                r.completed_at
+            FROM attack_runs AS r
+            JOIN attack_manifests AS m
+              ON m.manifest_fingerprint = r.manifest_fingerprint
+            ORDER BY r.started_at DESC, r.attack_run_id DESC
             LIMIT ?
             """,
             (max(1, min(limit, 500)),),

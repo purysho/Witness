@@ -44,5 +44,5 @@ export interface AttackRunSummary { attack_run_id:string; attack_manifest_finger
 export interface AttackEvalCaseResult extends Omit<LabCaseDetail,"has_trace"> {}
 export interface AttackEvalRunResult { run:EvalRunSummary; cases:AttackEvalCaseResult[]; }
 export interface AttackRunResult { run:AttackRunSummary; clean:AttackEvalRunResult; attacked:AttackEvalRunResult; cases:AttackCaseComparison[]; invariants:AttackInvariantResult[]; }
-export interface AttackRunListItem { attack_run_id:string; manifest_fingerprint:string; dataset_fingerprint:string; canonical_corpus_fingerprint:string; attacked_corpus_fingerprint:string; snapshot_id:string; snapshot_path:string; status:string; started_at:string; completed_at:string|null; }
+export interface AttackRunListItem { attack_run_id:string; manifest_fingerprint:string; attack_id:string; attack_name:string; dataset_fingerprint:string; canonical_corpus_fingerprint:string; attacked_corpus_fingerprint:string; snapshot_id:string; snapshot_path:string; status:string; started_at:string; completed_at:string|null; }
 
