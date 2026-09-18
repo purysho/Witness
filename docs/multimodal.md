@@ -57,3 +57,21 @@ The adapter deliberately fails closed for cases it cannot yet locate reproducibl
 - broken/empty image payloads become warnings rather than evidence.
 
 Pillow is a core Phase 7 dependency because pypdf requires it for image extraction. OCR is still not performed by this layer.
+
+
+## Visual retrieval route
+
+Visual retrieval is now an explicit transparent-router route. Queries containing visual terms such as `chart`, `figure`, `image`, `diagram`, or `table` request the route. If no visual index/provider is configured, Trace records the route as advisory rather than pretending it executed.
+
+When configured, visual results are converted into the shared retrieval-candidate contract with:
+
+- `evidence_kind = "visual"`;
+- the immutable `visual_evidence_id`;
+- the source-version ID;
+- the exact page-region locator;
+- the visual modality;
+- a label suitable for deterministic baseline reranking/generation.
+
+Visual candidates then participate in the same RRF and reranking stages as textual evidence. Fusion and reranking preserve the modality fields rather than flattening them away. ContextPack and validated citations also retain the visual evidence ID and modality.
+
+Ask Trace includes a dedicated `retrieval.visual.completed` event with the visual provider identity and candidate list. This makes the route that caused a page region to reach the answer directly inspectable.

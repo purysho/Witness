@@ -14,8 +14,12 @@ from witness_engine.multimodal import (
     VisualModality,
     index_pdf_visual_evidence,
 )
-from witness_engine.pipeline import index_document
-from witness_engine.retrieval import LocalEvidenceIndex
+from witness_engine.pipeline import ask_evidence, index_document
+from witness_engine.retrieval import (
+    DeterministicHashEmbeddingProvider,
+    LocalEvidenceIndex,
+    LocalVectorIndex,
+)
 
 
 def _source(tmp_path, lexical: LocalEvidenceIndex) -> str:
@@ -258,3 +262,78 @@ def test_pdf_visuals_can_be_indexed_through_main_pipeline(tmp_path):
         assert result.visual_evidence_count >= 1
         assert result.visual_embedding_count >= 1
         assert visual_index.count(provider.provider_id) >= 1
+
+
+
+class _AlignedVisualProvider:
+    provider_id = "fixture:aligned-visual-v1"
+    dimensions = 2
+
+    def embed_images(self, payloads):
+        return [(1.0, 0.0) for _ in payloads]
+
+    def embed_texts(self, texts):
+        return [(1.0, 0.0) for _ in texts]
+
+
+def test_visual_route_reaches_context_citation_and_trace(tmp_path):
+    source = tmp_path / "visual-source.md"
+    source.write_text(
+        "# Notes\n\nAdministrative notes only.\n",
+        encoding="utf-8",
+    )
+    database = tmp_path / "witness.sqlite3"
+    text_provider = DeterministicHashEmbeddingProvider(dimensions=8)
+    visual_provider = _AlignedVisualProvider()
+
+    with LocalEvidenceIndex(database) as lexical:
+        indexed = index_document(source, lexical)
+        store = VisualEvidenceStore(lexical)
+        visual = store.register(
+            source_version_id=indexed.source_version_id,
+            modality=VisualModality.CHART,
+            page_number=2,
+            region=NormalizedRegion(
+                x0=0.1,
+                y0=0.2,
+                x1=0.9,
+                y1=0.8,
+            ),
+            payload=b"quarterly-revenue-chart",
+            media_type="image/png",
+            label_text="Quarterly revenue chart shows 42 percent growth.",
+        )
+        with LocalVectorIndex(database) as vectors:
+            visual_index = LocalVisualVectorIndex(lexical)
+            assert visual_index.sync(visual_provider) == 1
+
+            result = ask_evidence(
+                "What does the chart show about quarterly revenue?",
+                lexical,
+                vectors,
+                text_provider,
+                visual_index=visual_index,
+                visual_embedding_provider=visual_provider,
+                limit=3,
+            )
+
+        assert result.retrieval.trace.plan.should_run("visual") is True
+        assert result.retrieval.trace.visual_candidates
+        assert result.retrieval.trace.visual_candidates[0].visual_evidence_id == (
+            visual.visual_evidence_id
+        )
+        assert any(
+            item.visual_evidence_id == visual.visual_evidence_id
+            and item.evidence_kind == "visual"
+            for item in result.context.evidence
+        )
+        assert any(
+            citation.visual_evidence_id == visual.visual_evidence_id
+            and citation.modality == "chart"
+            and citation.locator == visual.locator
+            for citation in result.answer.citations
+        )
+        assert any(
+            event.stage == "retrieval.visual.completed"
+            for event in result.trace
+        )

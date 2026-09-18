@@ -7,8 +7,8 @@ export interface RpcError { code:string; message:string; details?:Record<string,
 export type RpcEnvelope<T> = {v:1;id:string;type:"result";result:T}|{v:1;id:string;type:"error";error:RpcError};
 export interface WorkspaceOpenResult { path:string; database:string; source_versions:number; embedding_provider_id:string; visual_embedding_provider_id:string; }
 export interface SourceVersionSummary { source_version_id:string; logical_source_id:string; source_path:string; title:string; media_type:string; valid_from:string; valid_to:string|null; supersedes_source_version_id:string|null; superseded_by_source_version_id:string|null; }
-export interface ContextEvidence { evidence_id:string; chunk_id:string; text:string; source_version_id:string; locator:string|null; method:string; rank:number; }
-export interface Citation { evidence_id:string; chunk_id:string; source_version_id:string; locator:string|null; }
+export interface ContextEvidence { evidence_id:string; chunk_id:string; text:string; source_version_id:string; locator:string|null; method:string; rank:number; evidence_kind:string; visual_evidence_id:string; modality:string; }
+export interface Citation { evidence_id:string; chunk_id:string; source_version_id:string; locator:string|null; evidence_kind:string; visual_evidence_id:string; modality:string; }
 export interface AnswerSentence { text:string; evidence_ids:string[]; }
 export interface TraceEvent { event_id:string; run_id:string; sequence:number; schema_version:number; stage:string; payload:Record<string,unknown>; created_at:string; }
 export interface AskResult {
