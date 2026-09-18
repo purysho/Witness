@@ -8,3 +8,6 @@ Planned groups:
 - `attacks/` — prompt injection, stale-source, contradiction, distractor, duplication, and malformed-input fixtures.
 
 Fixtures must contain synthetic/public-safe data only. No private corpora or credentials belong in this repository.
+
+
+The eval directory includes an example schema-v1 benchmark. Gold evidence may identify chunks, immutable source versions, locators, source path suffixes, or a conjunction of those selectors.

@@ -19,7 +19,10 @@ Current capabilities:
 - explicit `SUFFICIENT`, `PARTIAL`, `CONFLICTED`, and `INSUFFICIENT` evidence states;
 - structured context packs, citation-ID validation, and a provider-neutral generation contract;
 - first complete Ask loop with sentence-level evidence IDs and persisted append-only Trace events;
-- serializable retrieval traces showing route reasons, specialized-route artifacts, RRF contributions, and pre/post-rerank positions.
+- serializable retrieval traces showing route reasons, specialized-route artifacts, RRF contributions, and pre/post-rerank positions;
+- persisted RAG Lab datasets and runs with content-addressed dataset/corpus/configuration snapshots;
+- lexical-only, dense-only, hybrid, and routed benchmark execution over the production Ask pipeline;
+- objective retrieval, citation, abstention, contradiction, latency, and cost-availability metrics plus A/B comparison and JSON/CSV export.
 
 ## Specialized retrieval
 
@@ -116,3 +119,12 @@ run.completed
 ```
 
 Trace payloads are versioned structured artifacts with stable event IDs: route decisions, per-route candidate lists, temporal selections, hierarchy expansions, graph paths, fusion/rerank movement, evidence relations, sufficiency features, context evidence IDs, and citation mappings. They do not contain hidden chain-of-thought.
+
+
+## RAG Lab
+
+The evaluation package treats benchmarks as immutable evidence-engineering artifacts. Dataset content is fingerprinted, each run records the corpus fingerprint and exact retrieval/provider configuration, and every case retains its QueryRun trace.
+
+Objective metrics currently include Recall@K, Precision@K, MRR, nDCG@K, citation precision, citation coverage, an objective gold-reference unsupported-claim proxy, abstention correctness, contradiction handling, exact sufficiency-state accuracy, and latency. Cost is recorded when a provider exposes a numeric cost meter; local deterministic providers are explicitly marked as unmetered.
+
+Model-judged metrics have a separate field and are not mixed with objective metrics. See docs/evaluation.md.

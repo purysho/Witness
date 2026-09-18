@@ -2,7 +2,7 @@
 
 The build order is deliberately evidence-first. We will not start with a polished chat UI and retrofit provenance later.
 
-**Implementation status (2026-09-18): Phases 3 and 4 complete.** Hybrid/specialized retrieval, typed local IPC, evidence reconciliation and sufficiency, context packs, structured answer validation, stage-by-stage Ask/Trace, claim extraction adapters, temporal/version handling, and the desktop Ask/Trace/Graph surfaces are implemented and covered by deterministic end-to-end and cross-stack CI. Packaged sidecar distribution remains Phase 8 work.
+**Implementation status (2026-09-18): Phases 3, 4, and 5 complete.** Witness now has hybrid/specialized retrieval, evidence reconciliation/time/graph behavior, functional Ask/Trace/Graph surfaces, and a persisted RAG Lab for reproducible lexical/dense/hybrid/routed evaluation. Attack Lab, multimodal evidence, and release hardening remain.
 
 ## Phase 0 — Specification and contracts
 
@@ -132,6 +132,8 @@ Exit gate:
 ---
 
 ## Phase 5 — RAG Lab
+
+**Status: Complete — 2026-09-18**
 
 **Goal:** turn Witness into a measurable retrieval engineering workbench.
 
