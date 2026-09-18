@@ -28,3 +28,38 @@ jobs:
         run: python -m pytest -q
       - name: Compile engine package
         run: python -m compileall -q src
+
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install engine
+        run: python -m pip install -e engine
+      - name: Verify generated RPC contracts
+        run: python tools/generate-contracts.py --check
+
+  desktop-web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/desktop
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install desktop dependencies
+        run: npm install --no-audit --no-fund
+      - name: Typecheck and build desktop frontend
+        run: npm run build
+
+  desktop-rust:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check Tauri host
+        run: cargo check --manifest-path apps/desktop/src-tauri/Cargo.toml
