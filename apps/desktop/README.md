@@ -1,6 +1,6 @@
 # Witness desktop
 
-The desktop shell is a functional Tauri 2 + React/TypeScript client for the Phase 3/4 engine.
+The desktop shell is a functional Tauri 2 + React/TypeScript client for the evidence engine through Phase 5.
 
 Implemented surfaces:
 
@@ -8,6 +8,7 @@ Implemented surfaces:
 - **Ask** — run the complete evidence-first query pipeline and inspect sentence-level citations.
 - **Trace** — inspect route decisions, retrieval artifacts, reconciliation, sufficiency, generation, validation, and persisted run events.
 - **Graph** — inspect SourceVersion, Entity, Claim, and Evidence nodes plus MENTIONS, SUPPORTS, CONTAINS, CONTRADICTS, and SUPERSEDES edges.
+- **Lab** — register evaluation datasets, run reproducible A/B retrieval configurations, compare objective metrics, open failed cases directly in Trace, inspect persisted run history, and export JSON/CSV.
 
 The frontend contains presentation logic only. Every evidence mutation or query goes through the Rust host to the Python engine over the versioned NDJSON protocol.
 
