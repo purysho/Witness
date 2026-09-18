@@ -1,5 +1,6 @@
 use serde_json::Value;
 use std::env;
+use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{
@@ -311,6 +312,20 @@ pub struct EngineState {
 }
 
 impl EngineState {
+    fn record_smoke_ready(response: &Value) {
+        let Some(path) = env::var_os("WITNESS_SMOKE_READY_FILE") else {
+            return;
+        };
+        let response_type = response
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown");
+        let payload = format!("engine-rpc-ready:{response_type}\n");
+        if let Err(error) = fs::write(path, payload) {
+            eprintln!("Could not write Witness smoke readiness marker: {error}");
+        }
+    }
+
     pub fn new(app: AppHandle) -> Self {
         Self {
             app,
@@ -335,10 +350,13 @@ impl EngineState {
             .expect("engine initialized")
             .call(request)
         {
-            Ok(response) => Ok(response),
+            Ok(response) => {
+                Self::record_smoke_ready(&response);
+                Ok(response)
+            }
             Err(first_error) => {
                 *guard = Some(EngineClient::spawn(&self.app)?);
-                guard
+                let response = guard
                     .as_mut()
                     .expect("engine restarted")
                     .call(request)
@@ -347,7 +365,9 @@ impl EngineState {
                             "Engine request failed after supervised restart: \
                              {first_error}; {second_error}"
                         )
-                    })
+                    })?;
+                Self::record_smoke_ready(&response);
+                Ok(response)
             }
         }
     }

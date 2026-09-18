@@ -31,42 +31,44 @@ if (-not $app) {
     throw "Could not locate the installed Witness desktop executable"
 }
 
+$readyFile = Join-Path $root ("witness-engine-ready-" + [Guid]::NewGuid().ToString("N") + ".txt")
+$previousReadyFile = $env:WITNESS_SMOKE_READY_FILE
+$env:WITNESS_SMOKE_READY_FILE = $readyFile
+
 Write-Host "Launching installed desktop: $($app.FullName)"
 $appProcess = Start-Process -FilePath $app.FullName -WorkingDirectory $installDir -PassThru
 
-$engineProcess = $null
-$deadline = [DateTime]::UtcNow.AddSeconds(30)
+$deadline = [DateTime]::UtcNow.AddSeconds(60)
 try {
     while ([DateTime]::UtcNow -lt $deadline) {
-        Start-Sleep -Seconds 1
+        Start-Sleep -Milliseconds 500
         $appProcess.Refresh()
         if ($appProcess.HasExited) {
-            throw "Installed Witness desktop exited before engine startup (code $($appProcess.ExitCode))"
+            throw "Installed Witness desktop exited before engine readiness (code $($appProcess.ExitCode))"
         }
-
-        $engineProcess = Get-Process -ErrorAction SilentlyContinue | Where-Object {
-            try {
-                $_.Path -and ([IO.Path]::GetFullPath($_.Path) -eq [IO.Path]::GetFullPath($engine.FullName))
-            } catch {
-                $false
+        if (Test-Path $readyFile) {
+            $ready = (Get-Content $readyFile -Raw).Trim()
+            if ($ready -like "engine-rpc-ready:*") {
+                Write-Host "Installed app completed bundled-engine RPC: $ready"
+                break
             }
-        } | Select-Object -First 1
-        if ($engineProcess) { break }
+        }
     }
 
-    if (-not $engineProcess) {
-        throw "Installed Witness desktop did not start its bundled engine within the smoke window"
+    if (-not (Test-Path $readyFile)) {
+        throw "Installed Witness desktop did not complete a bundled-engine RPC within the smoke window"
     }
-
-    Write-Host "Installed app started bundled engine PID $($engineProcess.Id)"
 }
 finally {
     if ($appProcess -and -not $appProcess.HasExited) {
         Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
         $appProcess.WaitForExit(5000) | Out-Null
     }
-    if ($engineProcess) {
-        Stop-Process -Id $engineProcess.Id -Force -ErrorAction SilentlyContinue
+    Remove-Item -Force $readyFile -ErrorAction SilentlyContinue
+    if ($null -eq $previousReadyFile) {
+        Remove-Item Env:WITNESS_SMOKE_READY_FILE -ErrorAction SilentlyContinue
+    } else {
+        $env:WITNESS_SMOKE_READY_FILE = $previousReadyFile
     }
 }
 
