@@ -2,6 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   PROTOCOL_VERSION,
   type AskResult,
+  type AttackManifestSummary,
+  type AttackRunListItem,
+  type AttackRunResult,
   type EvalConfigInput,
   type EvalDatasetSummary,
   type EvalRunSummary,
@@ -78,5 +81,26 @@ export const engine = {
       run_id: runId,
       format,
       ...(path ? { path } : {}),
+    }),
+
+  attackLoadManifest: (path: string) =>
+    call<AttackManifestSummary>("attack.manifest.load", { path }),
+  attackManifests: () =>
+    call<{ manifests: AttackManifestSummary[] }>("attack.manifest.list"),
+  attackRun: (
+    manifestFingerprint: string,
+    datasetFingerprint: string,
+    config: EvalConfigInput,
+  ) =>
+    call<AttackRunResult>("attack.run", {
+      manifest_fingerprint: manifestFingerprint,
+      dataset_fingerprint: datasetFingerprint,
+      config,
+    }),
+  attackRuns: (limit = 50) =>
+    call<{ runs: AttackRunListItem[] }>("attack.runs", { limit }),
+  attackRunGet: (attackRunId: string) =>
+    call<AttackRunResult>("attack.run.get", {
+      attack_run_id: attackRunId,
     }),
 };

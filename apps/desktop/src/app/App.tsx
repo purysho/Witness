@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import type {
   AskResult,
+  AttackManifestSummary,
+  AttackRunListItem,
+  AttackRunResult,
   EvalConfigInput,
   EvalDatasetSummary,
   EvalRunSummary,
@@ -11,12 +14,13 @@ import type {
 } from "../../../../contracts/generated/rpc";
 import { engine } from "../contracts/client";
 import { AskView } from "../features/ask/AskView";
+import { AttackView } from "../features/attack/AttackView";
 import { GraphView } from "../features/graph/GraphView";
 import { LabView } from "../features/lab/LabView";
 import { LibraryPanel } from "../features/library/LibraryPanel";
 import { TraceView } from "../features/trace/TraceView";
 
-type Tab = "ask" | "trace" | "graph" | "lab";
+type Tab = "ask" | "trace" | "graph" | "lab" | "attack";
 
 export function App() {
   const [tab, setTab] = useState<Tab>("ask");
@@ -32,6 +36,9 @@ export function App() {
   const [labRuns, setLabRuns] = useState<EvalRunSummary[]>([]);
   const [labComparison, setLabComparison] = useState<LabComparison | null>(null);
   const [labExportPath, setLabExportPath] = useState<string | null>(null);
+  const [attackManifests, setAttackManifests] = useState<AttackManifestSummary[]>([]);
+  const [attackRuns, setAttackRuns] = useState<AttackRunListItem[]>([]);
+  const [attackResult, setAttackResult] = useState<AttackRunResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("Engine not contacted yet.");
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +63,15 @@ export function App() {
     setLabRuns(runs.runs);
   }
 
+  async function refreshAttack() {
+    const [manifests, runs] = await Promise.all([
+      engine.attackManifests(),
+      engine.attackRuns(),
+    ]);
+    setAttackManifests(manifests.manifests);
+    setAttackRuns(runs.runs);
+  }
+
   async function openWorkspace() {
     setBusy(true);
     setError(null);
@@ -66,7 +82,8 @@ export function App() {
       setGraph(null);
       setLabComparison(null);
       setLabExportPath(null);
-      await Promise.all([refreshSources(), refreshLab()]);
+      setAttackResult(null);
+      await Promise.all([refreshSources(), refreshLab(), refreshAttack()]);
       setStatus("Workspace open · " + opened.embedding_provider_id);
     } catch (reason) {
       setError(String(reason));
@@ -220,12 +237,96 @@ export function App() {
     }
   }
 
+  async function loadAttackManifest(path: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const manifest = await engine.attackLoadManifest(path);
+      await refreshAttack();
+      setStatus(
+        "Attack manifest registered · " +
+          manifest.name +
+          " · " +
+          manifest.mutation_count +
+          " mutations",
+      );
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runAttack(
+    manifestFingerprint: string,
+    datasetFingerprint: string,
+    config: EvalConfigInput,
+  ) {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await engine.attackRun(
+        manifestFingerprint,
+        datasetFingerprint,
+        config,
+      );
+      setAttackResult(result);
+      await Promise.all([refreshAttack(), refreshLab()]);
+      const failed = result.invariants.filter((item) => item.status === "FAIL").length;
+      setStatus(
+        "Attack run complete · " +
+          result.run.attack_name +
+          " · " +
+          failed +
+          " invariant failures",
+      );
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function loadAttackRun(attackRunId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      setAttackResult(await engine.attackRunGet(attackRunId));
+      setStatus("Loaded persisted Attack Lab run · " + attackRunId.slice(0, 10));
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function inspectAttackCase(
+    side: "clean" | "attacked",
+    caseId: string,
+  ) {
+    const caseResult = attackResult?.[side].cases.find(
+      (item) => item.case_id === caseId,
+    );
+    if (!caseResult?.ask_result) {
+      setError("This attack case has no completed Ask trace.");
+      return;
+    }
+    setResult(caseResult.ask_result);
+    setTab("trace");
+    setStatus(
+      "Opened " + side + " attack trace · " + caseId,
+    );
+  }
+
   useEffect(() => {
     if (tab === "graph" && workspace && !graph && !busy) {
       void refreshGraph();
     }
     if (tab === "lab" && workspace && !busy) {
       void refreshLab();
+    }
+    if (tab === "attack" && workspace && !busy) {
+      void refreshAttack();
     }
   }, [tab, workspace]);
 
@@ -234,6 +335,7 @@ export function App() {
     { tab: "trace", number: "02" },
     { tab: "graph", number: "03" },
     { tab: "lab", number: "04" },
+    { tab: "attack", number: "05" },
   ];
 
   return (
@@ -339,6 +441,20 @@ export function App() {
               graph={graph}
               onRefresh={refreshGraph}
               busy={busy}
+            />
+          )}
+          {tab === "attack" && (
+            <AttackView
+              workspaceReady={Boolean(workspace)}
+              busy={busy}
+              datasets={labDatasets}
+              manifests={attackManifests}
+              runs={attackRuns}
+              result={attackResult}
+              onLoadManifest={loadAttackManifest}
+              onRun={runAttack}
+              onLoadRun={loadAttackRun}
+              onInspectCase={inspectAttackCase}
             />
           )}
           {tab === "lab" && (
