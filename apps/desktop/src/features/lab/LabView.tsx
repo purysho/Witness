@@ -31,6 +31,7 @@ interface Props {
     configB: EvalConfigInput,
   ) => void;
   onInspectCase: (runId: string, caseId: string) => void;
+  onCompareRuns: (runA: string, runB: string) => void;
   onExport: (runId: string, format: "json" | "csv") => void;
 }
 
@@ -44,6 +45,7 @@ export function LabView({
   onLoadDataset,
   onRunAB,
   onInspectCase,
+  onCompareRuns,
   onExport,
 }: Props) {
   const [datasetPath, setDatasetPath] = useState("");
@@ -53,6 +55,8 @@ export function LabView({
   const [topK, setTopK] = useState(10);
   const [rerankA, setRerankA] = useState(true);
   const [rerankB, setRerankB] = useState(true);
+  const [historyA, setHistoryA] = useState("");
+  const [historyB, setHistoryB] = useState("");
 
   const selected = selectedFingerprint || datasets[0]?.dataset_fingerprint || "";
   const selectedDataset = useMemo(
@@ -259,7 +263,7 @@ export function LabView({
         <h2>Persisted benchmarks</h2>
         <div className="lab-run-list">
           {runs.length === 0 ? <div className="empty">No Lab runs yet.</div> : runs.slice(0, 12).map((run) => (
-            <article key={run.run_id}>
+            <article key={run.run_id} className={historyA === run.run_id || historyB === run.run_id ? "history-selected" : ""}>
               <div>
                 <strong>{run.config.name}</strong>
                 <span>{run.config.retrieval_mode}</span>
@@ -270,8 +274,23 @@ export function LabView({
                   ? run.metrics.passed_cases + "/" + run.metrics.case_count + " passed · " + run.metrics.mean_latency_ms.toFixed(1) + " ms mean"
                   : run.status}
               </small>
+              <div className="history-buttons">
+                <button className={historyA === run.run_id ? "history-active" : ""} onClick={() => setHistoryA(run.run_id)}>A</button>
+                <button className={historyB === run.run_id ? "history-active" : ""} onClick={() => setHistoryB(run.run_id)}>B</button>
+              </div>
             </article>
           ))}
+        </div>
+        <div className="lab-history-compare">
+          <span>{historyA ? "A " + historyA.slice(0, 8) : "A not selected"}</span>
+          <span>{historyB ? "B " + historyB.slice(0, 8) : "B not selected"}</span>
+          <button
+            className="secondary"
+            disabled={busy || !historyA || !historyB || historyA === historyB}
+            onClick={() => onCompareRuns(historyA, historyB)}
+          >
+            Compare history
+          </button>
         </div>
         <div className="lab-snapshot">
           <strong>Reproducibility</strong>
