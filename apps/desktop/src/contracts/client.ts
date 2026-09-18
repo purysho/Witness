@@ -5,18 +5,22 @@ import {
   type AttackManifestSummary,
   type AttackRunListItem,
   type AttackRunResult,
+  type DemoLoadResult,
   type EvalConfigInput,
   type EvalDatasetSummary,
   type EvalRunSummary,
   type GraphSnapshot,
   type LabCaseDetail,
+  type ProviderSnapshot,
   type LabComparison,
   type LabRunResult,
   type RpcEnvelope,
   type RpcRequest,
   type SourceVersionSummary,
   type VisualEvidencePreview,
+  type WorkspaceHealthReport,
   type WorkspaceOpenResult,
+  type WorkspaceRepairResult,
 } from "../../../../contracts/generated/rpc";
 
 let sequence = 0;
@@ -43,10 +47,29 @@ export const engine = {
   ping: () => call<{ ok: boolean; protocol_version: number }>("ping"),
   openWorkspace: (path: string) =>
     call<WorkspaceOpenResult>("workspace.open", { path }),
-  importSource: (path: string, validFrom?: string) =>
+  workspaceHealth: () =>
+    call<WorkspaceHealthReport>("workspace.health"),
+  repairWorkspace: () =>
+    call<WorkspaceRepairResult>("workspace.repair"),
+  providerSettings: () =>
+    call<ProviderSnapshot>("providers.get"),
+  loadDemo: () =>
+    call<DemoLoadResult>("demo.load"),
+  setProviderSettings: (
+    embeddingDimensions: number,
+    visualMode: "off" | "hash",
+    visualDimensions: number,
+  ) =>
+    call<ProviderSnapshot>("providers.set", {
+      embedding_dimensions: embeddingDimensions,
+      visual_mode: visualMode,
+      visual_dimensions: visualDimensions,
+    }),
+  importSource: (path: string, validFrom?: string, jobId?: string) =>
     call<Record<string, unknown>>("source.import", {
       path,
       ...(validFrom ? { valid_from: validFrom } : {}),
+      ...(jobId ? { job_id: jobId } : {}),
     }),
   listSources: () =>
     call<{ sources: SourceVersionSummary[] }>("source.list"),
@@ -63,15 +86,25 @@ export const engine = {
     call<VisualEvidencePreview>("visual.evidence.get", {
       visual_evidence_id: visualEvidenceId,
     }),
+  cancelJob: (workspacePath: string, jobId: string) =>
+    invoke<void>("cancel_job", {
+      workspacePath,
+      jobId,
+    }),
 
   labLoadDataset: (path: string) =>
     call<EvalDatasetSummary>("lab.dataset.load", { path }),
   labDatasets: () =>
     call<{ datasets: EvalDatasetSummary[] }>("lab.dataset.list"),
-  labRun: (datasetFingerprint: string, config: EvalConfigInput) =>
+  labRun: (
+    datasetFingerprint: string,
+    config: EvalConfigInput,
+    jobId?: string,
+  ) =>
     call<LabRunResult>("lab.run", {
       dataset_fingerprint: datasetFingerprint,
       config,
+      ...(jobId ? { job_id: jobId } : {}),
     }),
   labRuns: (limit = 50) =>
     call<{ runs: EvalRunSummary[] }>("lab.runs", { limit }),
@@ -96,11 +129,13 @@ export const engine = {
     manifestFingerprint: string,
     datasetFingerprint: string,
     config: EvalConfigInput,
+    jobId?: string,
   ) =>
     call<AttackRunResult>("attack.run", {
       manifest_fingerprint: manifestFingerprint,
       dataset_fingerprint: datasetFingerprint,
       config,
+      ...(jobId ? { job_id: jobId } : {}),
     }),
   attackRuns: (limit = 50) =>
     call<{ runs: AttackRunListItem[] }>("attack.runs", { limit }),

@@ -1,0 +1,20 @@
+{
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "externalBin": ["binaries/witness-engine"],
+    "publisher": "Purysho",
+    "shortDescription": "Evidence-first RAG workbench",
+    "longDescription": "Witness is a local-first evidence workbench for inspectable retrieval, citations, evaluation, and adversarial RAG testing.",
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installMode": "currentUser",
+        "installerIcon": "icons/icon.ico"
+      }
+    }
+  }
+}

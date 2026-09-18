@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import type {
   AskResult,
   AttackManifestSummary,
@@ -9,8 +10,10 @@ import type {
   EvalRunSummary,
   GraphSnapshot,
   LabComparison,
+  ProviderSnapshot,
   SourceVersionSummary,
   VisualEvidencePreview,
+  WorkspaceHealthReport,
   WorkspaceOpenResult,
 } from "../../../../contracts/generated/rpc";
 import { engine } from "../contracts/client";
@@ -19,15 +22,50 @@ import { AttackView } from "../features/attack/AttackView";
 import { GraphView } from "../features/graph/GraphView";
 import { LabView } from "../features/lab/LabView";
 import { LibraryPanel } from "../features/library/LibraryPanel";
+import { ProviderPanel } from "../features/providers/ProviderPanel";
 import { TraceView } from "../features/trace/TraceView";
 import { VisualEvidenceViewer } from "../features/visual/VisualEvidenceViewer";
 
 type Tab = "ask" | "trace" | "graph" | "lab" | "attack";
 
+const LAST_WORKSPACE_KEY = "witness:last-workspace";
+
+function rememberedWorkspace(): string {
+  try {
+    return window.localStorage.getItem(LAST_WORKSPACE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberWorkspace(path: string) {
+  try {
+    window.localStorage.setItem(LAST_WORKSPACE_KEY, path);
+  } catch {
+    // A remembered path is a convenience only; workspace state stays canonical
+    // in the engine and must not depend on browser storage.
+  }
+}
+
+function createJobId(kind: string): string {
+  const suffix =
+    globalThis.crypto?.randomUUID?.() ??
+    Math.random().toString(36).slice(2);
+  return kind + "-" + Date.now() + "-" + suffix;
+}
+
+function isCancellation(reason: unknown): boolean {
+  const message = String(reason).toLocaleLowerCase();
+  return message.includes("cancelled") || message.includes("canceled");
+}
+
 export function App() {
   const [tab, setTab] = useState<Tab>("ask");
-  const [workspacePath, setWorkspacePath] = useState("");
+  const [workspacePath, setWorkspacePath] = useState(rememberedWorkspace);
   const [workspace, setWorkspace] = useState<WorkspaceOpenResult | null>(null);
+  const [workspaceHealth, setWorkspaceHealth] =
+    useState<WorkspaceHealthReport | null>(null);
+  const [providers, setProviders] = useState<ProviderSnapshot | null>(null);
   const [sourcePath, setSourcePath] = useState("");
   const [validFrom, setValidFrom] = useState("");
   const [sources, setSources] = useState<SourceVersionSummary[]>([]);
@@ -43,6 +81,8 @@ export function App() {
   const [attackResult, setAttackResult] = useState<AttackRunResult | null>(null);
   const [visualPreview, setVisualPreview] = useState<VisualEvidencePreview | null>(null);
   const [busy, setBusy] = useState(false);
+  const [activeJob, setActiveJob] =
+    useState<{ id: string; label: string } | null>(null);
   const [status, setStatus] = useState("Engine not contacted yet.");
   const [error, setError] = useState<string | null>(null);
 
@@ -56,6 +96,19 @@ export function App() {
   async function refreshSources() {
     setSources((await engine.listSources()).sources);
   }
+
+  async function refreshWorkspaceHealth() {
+    const report = await engine.workspaceHealth();
+    setWorkspaceHealth(report);
+    return report;
+  }
+
+  async function refreshProviders() {
+    const snapshot = await engine.providerSettings();
+    setProviders(snapshot);
+    return snapshot;
+  }
+
 
   async function refreshLab() {
     const [datasets, runs] = await Promise.all([
@@ -75,20 +128,39 @@ export function App() {
     setAttackRuns(runs.runs);
   }
 
-  async function openWorkspace() {
+  async function openWorkspacePath(path: string) {
+    const normalized = path.trim();
+    if (!normalized) {
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const opened = await engine.openWorkspace(workspacePath);
+      const opened = await engine.openWorkspace(normalized);
+      setWorkspacePath(opened.path);
+      rememberWorkspace(opened.path);
       setWorkspace(opened);
+      setWorkspaceHealth(null);
+      setProviders(null);
       setResult(null);
       setGraph(null);
       setLabComparison(null);
       setLabExportPath(null);
       setAttackResult(null);
       setVisualPreview(null);
-      await Promise.all([refreshSources(), refreshLab(), refreshAttack()]);
-      setStatus("Workspace open · " + opened.embedding_provider_id);
+      const [, , , health] = await Promise.all([
+        refreshSources(),
+        refreshLab(),
+        refreshAttack(),
+        refreshWorkspaceHealth(),
+        refreshProviders(),
+      ]);
+      setStatus(
+        "Workspace open · " +
+          opened.embedding_provider_id +
+          " · health " +
+          health.status,
+      );
     } catch (reason) {
       setError(String(reason));
     } finally {
@@ -96,15 +168,164 @@ export function App() {
     }
   }
 
-  async function importSource() {
+  async function openWorkspace() {
+    await openWorkspacePath(workspacePath);
+  }
+
+  async function browseWorkspace() {
+    setError(null);
+    try {
+      const selected = await openDialog({
+        directory: true,
+        multiple: false,
+        title: "Choose a Witness workspace folder",
+      });
+      if (typeof selected === "string") {
+        setWorkspacePath(selected);
+        await openWorkspacePath(selected);
+      }
+    } catch (reason) {
+      setError("Could not open workspace picker: " + String(reason));
+    }
+  }
+
+  async function loadFirstRunDemo() {
     setBusy(true);
     setError(null);
     try {
-      await engine.importSource(sourcePath, validFrom || undefined);
-      await refreshSources();
+      const demo = await engine.loadDemo();
+      const [sourceState, , , health, providerState] = await Promise.all([
+        engine.listSources(),
+        refreshLab(),
+        refreshAttack(),
+        refreshWorkspaceHealth(),
+        refreshProviders(),
+      ]);
+      setSources(sourceState.sources);
+      setProviders(providerState);
+      setQuestion(demo.suggested_question);
+      const response = await engine.ask(demo.suggested_question);
+      setResult(response);
+      setTab("trace");
+      setStatus(
+        "Demo ready · " +
+          demo.dataset.name +
+          " · Trace opened · " +
+          response.answer.state,
+      );
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function browseSource() {
+    setError(null);
+    try {
+      const selected = await openDialog({
+        directory: false,
+        multiple: false,
+        title: "Choose an evidence source",
+        filters: [
+          {
+            name: "Evidence files",
+            extensions: [
+              "pdf", "md", "markdown", "txt", "html", "htm",
+              "docx", "pptx", "xlsx", "csv", "json", "py", "js",
+              "ts", "tsx", "jsx", "rs", "go", "java", "c", "cpp",
+              "h", "hpp", "toml", "yaml", "yml",
+            ],
+          },
+        ],
+      });
+      if (typeof selected === "string") {
+        setSourcePath(selected);
+      }
+    } catch (reason) {
+      setError("Could not open source picker: " + String(reason));
+    }
+  }
+
+  async function importSource() {
+    const jobId = createJobId("import");
+    setBusy(true);
+    setActiveJob({ id: jobId, label: "source import" });
+    setError(null);
+    try {
+      await engine.importSource(
+        sourcePath,
+        validFrom || undefined,
+        jobId,
+      );
+      await Promise.all([
+        refreshSources(),
+        refreshWorkspaceHealth(),
+        refreshProviders(),
+      ]);
       setSourcePath("");
       setStatus(
         "Source indexed into lexical, dense, temporal, hierarchy, graph, and visual projections.",
+      );
+    } catch (reason) {
+      if (isCancellation(reason)) {
+        await Promise.all([refreshSources(), refreshWorkspaceHealth()]);
+        setStatus("Source import cancelled · partial new-version state rolled back.");
+      } else {
+        setError(String(reason));
+      }
+    } finally {
+      setActiveJob((current) => current?.id === jobId ? null : current);
+      setBusy(false);
+    }
+  }
+
+  async function repairWorkspaceIndexes() {
+    setBusy(true);
+    setError(null);
+    try {
+      const repaired = await engine.repairWorkspace();
+      setWorkspaceHealth(repaired.after);
+      await refreshProviders();
+      setStatus(
+        repaired.actions.length
+          ? "Workspace repaired · " + repaired.actions.join(" · ")
+          : "Workspace checked · no repairable projections needed",
+      );
+      if (!repaired.protected_state_unchanged) {
+        throw new Error(
+          "Repair changed protected workspace state; this should never occur.",
+        );
+      }
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function applyProviderSettings(
+    embeddingDimensions: number,
+    visualMode: "off" | "hash",
+    visualDimensions: number,
+  ) {
+    setBusy(true);
+    setError(null);
+    try {
+      const snapshot = await engine.setProviderSettings(
+        embeddingDimensions,
+        visualMode,
+        visualDimensions,
+      );
+      setProviders(snapshot);
+      const health = await refreshWorkspaceHealth();
+      const needsRepair =
+        snapshot.embedding.reindex_required ||
+        snapshot.visual.reindex_required;
+      setStatus(
+        needsRepair
+          ? "Provider settings applied · derived indexes need repair"
+          : "Provider settings applied · indexes current · health " + health.status,
       );
     } catch (reason) {
       setError(String(reason));
@@ -164,12 +385,26 @@ export function App() {
     configA: EvalConfigInput,
     configB: EvalConfigInput,
   ) {
+    const jobA = createJobId("lab-a");
+    let activeId = jobA;
     setBusy(true);
+    setActiveJob({ id: jobA, label: "Lab run A" });
     setError(null);
     setLabExportPath(null);
     try {
-      const runA = await engine.labRun(datasetFingerprint, configA);
-      const runB = await engine.labRun(datasetFingerprint, configB);
+      const runA = await engine.labRun(
+        datasetFingerprint,
+        configA,
+        jobA,
+      );
+      const jobB = createJobId("lab-b");
+      activeId = jobB;
+      setActiveJob({ id: jobB, label: "Lab run B" });
+      const runB = await engine.labRun(
+        datasetFingerprint,
+        configB,
+        jobB,
+      );
       const comparison = await engine.labCompare(
         runA.run.run_id,
         runB.run.run_id,
@@ -183,8 +418,14 @@ export function App() {
           comparison.run_b.config.retrieval_mode,
       );
     } catch (reason) {
-      setError(String(reason));
+      if (isCancellation(reason)) {
+        await refreshLab();
+        setStatus("Lab run cancelled · completed case results were preserved.");
+      } else {
+        setError(String(reason));
+      }
     } finally {
+      setActiveJob((current) => current?.id === activeId ? null : current);
       setBusy(false);
     }
   }
@@ -266,13 +507,16 @@ export function App() {
     datasetFingerprint: string,
     config: EvalConfigInput,
   ) {
+    const jobId = createJobId("attack");
     setBusy(true);
+    setActiveJob({ id: jobId, label: "Attack Lab run" });
     setError(null);
     try {
       const result = await engine.attackRun(
         manifestFingerprint,
         datasetFingerprint,
         config,
+        jobId,
       );
       setAttackResult(result);
       await Promise.all([refreshAttack(), refreshLab()]);
@@ -285,8 +529,14 @@ export function App() {
           " invariant failures",
       );
     } catch (reason) {
-      setError(String(reason));
+      if (isCancellation(reason)) {
+        await Promise.all([refreshAttack(), refreshLab()]);
+        setStatus("Attack Lab run cancelled · canonical corpus remains isolated.");
+      } else {
+        setError(String(reason));
+      }
     } finally {
+      setActiveJob((current) => current?.id === jobId ? null : current);
       setBusy(false);
     }
   }
@@ -336,6 +586,19 @@ export function App() {
     setStatus(
       "Opened " + side + " attack trace · " + caseId,
     );
+  }
+
+  async function cancelActiveJob() {
+    if (!workspace || !activeJob) {
+      return;
+    }
+    setError(null);
+    try {
+      await engine.cancelJob(workspace.path, activeJob.id);
+      setStatus("Cancellation requested · " + activeJob.label);
+    } catch (reason) {
+      setError("Could not request cancellation: " + String(reason));
+    }
   }
 
   async function openVisualEvidence(visualEvidenceId: string) {
@@ -420,13 +683,30 @@ export function App() {
               placeholder="C:\Witness\Research.witness"
             />
           </label>
-          <button
-            className="secondary"
-            disabled={busy || !workspacePath.trim()}
-            onClick={openWorkspace}
-          >
-            {workspace ? "Reopen" : "Open workspace"}
-          </button>
+          <div className="workspace-actions">
+            <button
+              className="secondary"
+              disabled={busy}
+              onClick={browseWorkspace}
+            >
+              Browse
+            </button>
+            <button
+              className="secondary"
+              disabled={busy || !workspacePath.trim()}
+              onClick={openWorkspace}
+            >
+              {workspace ? "Reopen" : "Open workspace"}
+            </button>
+          </div>
+          {activeJob && (
+            <button
+              className="cancel-job"
+              onClick={cancelActiveJob}
+            >
+              Cancel {activeJob.label}
+            </button>
+          )}
           <div className="engine-status">
             <span className={workspace ? "status-dot ready" : "status-dot"} />
             <div>
@@ -446,13 +726,113 @@ export function App() {
           </div>
         )}
 
+        {!workspace && (
+          <section className="panel first-run-panel">
+            <div>
+              <span className="eyebrow">FIRST RUN</span>
+              <h2>Start with a local evidence workspace</h2>
+              <p>
+                Choose a folder for Witness. Your source versions, indexes,
+                traces, Lab runs, and attack artifacts stay inside that local
+                workspace.
+              </p>
+            </div>
+            <ol className="first-run-steps">
+              <li><strong>01</strong><span>Choose or create a workspace folder.</span></li>
+              <li><strong>02</strong><span>Add a local evidence file from Library.</span></li>
+              <li><strong>03</strong><span>Ask a question, then inspect its Trace.</span></li>
+            </ol>
+            <div className="first-run-actions">
+              <button className="primary" disabled={busy} onClick={browseWorkspace}>
+                Choose workspace
+              </button>
+              {workspacePath.trim() && (
+                <button
+                  className="secondary"
+                  disabled={busy}
+                  onClick={openWorkspace}
+                >
+                  Open remembered workspace
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
+        {workspace && workspaceHealth && (
+          <section
+            className={
+              "workspace-health-panel health-" + workspaceHealth.status
+            }
+          >
+            <div>
+              <span>WORKSPACE HEALTH</span>
+              <strong>{workspaceHealth.status.toUpperCase()}</strong>
+              <small>
+                {workspaceHealth.issues.length === 0
+                  ? "Canonical evidence and derived projections are consistent."
+                  : workspaceHealth.issues[0].detail}
+              </small>
+            </div>
+            <div className="workspace-health-actions">
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={() => void refreshWorkspaceHealth()}
+              >
+                Recheck
+              </button>
+              {workspaceHealth.issues.some((item) => item.repairable) && (
+                <button
+                  className="primary"
+                  disabled={busy}
+                  onClick={repairWorkspaceIndexes}
+                >
+                  Repair derived indexes
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+
+        {workspace && sources.length === 0 && (
+          <section className="demo-onboarding">
+            <div>
+              <span className="eyebrow">FIRST-RUN DEMO</span>
+              <strong>See the complete evidence loop with one local demo pack.</strong>
+              <small>
+                Installs versioned API evidence, authentication evidence, a Lab
+                benchmark, and a prompt-injection Attack fixture. Witness then
+                asks the temporal demo question and opens its real Trace.
+              </small>
+            </div>
+            <button
+              className="primary"
+              disabled={busy}
+              onClick={loadFirstRunDemo}
+            >
+              Load demo & open Trace
+            </button>
+          </section>
+        )}
+
+        {workspace && providers && (
+          <ProviderPanel
+            snapshot={providers}
+            busy={busy}
+            onApply={applyProviderSettings}
+          />
+        )}
+
         <LibraryPanel
           sourcePath={sourcePath}
           validFrom={validFrom}
           sources={sources}
           busy={busy}
+          workspaceReady={Boolean(workspace)}
           onSourcePath={setSourcePath}
           onValidFrom={setValidFrom}
+          onBrowseSource={browseSource}
           onImport={importSource}
         />
 

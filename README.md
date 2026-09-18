@@ -57,10 +57,11 @@ Witness is an **evidence and retrieval workbench**, not a general-purpose autono
 - [`ARCHITECTURE.md`](ARCHITECTURE.md) — technical architecture and data flow
 - [`ROADMAP.md`](ROADMAP.md) — staged implementation plan
 - [`SECURITY.md`](SECURITY.md) — threat model and source-safety rules
+- [`V1_RELEASE_CHECKLIST.md`](V1_RELEASE_CHECKLIST.md) — acceptance criteria mapped to automated tests and release gates
 - [`docs/evaluation.md`](docs/evaluation.md) — RAG Lab datasets, metrics, snapshots, comparison, and export semantics
 - [`docs/attack-lab.md`](docs/attack-lab.md) — Attack Lab isolation, manifests, invariants, reproducibility, and export
 - [`docs/multimodal.md`](docs/multimodal.md) — visual evidence identity, page-region provenance, asset storage, retrieval, evaluation, and viewer semantics
 
 ## Status
 
-**Phases 3, 4, 5, 6, and 7 complete; Phase 8 is next.** Witness now has functional Library, Ask, Trace, Graph, Lab, and Attack surfaces plus provenance-safe multimodal evidence: PDF image-region extraction, visual routing, multimodal citations and Trace, RAG Lab visual-gold evaluation, and a cited visual evidence viewer. Semantic visual search is provider-explicit; release hardening remains Phase 8 work.
+**Phases 0–8 complete; Witness V1 satisfies the acceptance gate in `SPECIFICATION.md`.** The release candidate includes the full Library/Ask/Trace/Graph/Lab/Attack workflow, versioned mixed-format ingestion, provenance-safe multimodal evidence, cancellable jobs, fail-closed workspace recovery, secret-free provider configuration, the first-run demo, and Windows NSIS packaging. CI verifies Ubuntu/Windows engine tests, generated contracts, the desktop frontend, the Tauri host, frozen-engine persistence, and an installed desktop → bundled-engine RPC round trip.

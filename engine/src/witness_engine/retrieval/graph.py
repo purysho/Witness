@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import asdict, dataclass
-from typing import Iterable
+from typing import Callable, Iterable
 
 from ..chunking import Chunk
 from ..graph.extraction import ClaimExtractionProvider, DeterministicClaimExtractionProvider
@@ -110,11 +110,20 @@ class LocalEvidenceGraph:
             """
         )
 
-    def index_chunks(self, rows: Iterable[tuple[Chunk, str, str]]) -> int:
+    def index_chunks(
+        self,
+        rows: Iterable[tuple[Chunk, str, str]],
+        *,
+        cancel_check: Callable[[], None] | None = None,
+    ) -> int:
         claim_edges = 0
         with self.connection:
             for chunk, _source_version_id, _locator in rows:
+                if cancel_check is not None:
+                    cancel_check()
                 for extracted in self.extraction_provider.extract(chunk.text):
+                    if cancel_check is not None:
+                        cancel_check()
                     sentence = extracted.text
                     normalized = _normalize_claim(sentence)
                     claim_id = stable_id("claim", normalized)
@@ -162,6 +171,42 @@ class LocalEvidenceGraph:
                             (claim_id, entity_id),
                         )
         return claim_edges
+
+    def rebuild_from_chunks(self) -> int:
+        """Rebuild the disposable claim/entity graph from canonical chunks."""
+
+        rows = self.connection.execute(
+            """
+            SELECT
+                chunk_id, block_id, text, start_offset, end_offset,
+                source_version_id, locator
+            FROM indexed_chunks
+            ORDER BY chunk_id
+            """
+        ).fetchall()
+        chunks = [
+            (
+                Chunk(
+                    chunk_id=row["chunk_id"],
+                    block_id=row["block_id"],
+                    text=row["text"],
+                    start=int(row["start_offset"]),
+                    end=int(row["end_offset"]),
+                ),
+                row["source_version_id"],
+                row["locator"],
+            )
+            for row in rows
+        ]
+
+        with self.connection:
+            self.connection.execute("DELETE FROM graph_claim_entities")
+            self.connection.execute("DELETE FROM graph_claim_evidence")
+            self.connection.execute("DELETE FROM graph_entities")
+            self.connection.execute("DELETE FROM graph_claims_fts")
+            self.connection.execute("DELETE FROM graph_claims")
+
+        return self.index_chunks(chunks)
 
     @staticmethod
     def _match_expression(query: str) -> str:

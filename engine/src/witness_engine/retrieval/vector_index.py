@@ -11,7 +11,7 @@ import sqlite3
 import struct
 from hashlib import sha256
 from pathlib import Path
-from typing import Sequence
+from typing import Callable, Sequence
 
 from .embeddings import EmbeddingProvider, Vector, normalize
 from .models import RetrievalCandidate
@@ -97,6 +97,7 @@ class LocalVectorIndex:
         *,
         source_version_id: str | None = None,
         batch_size: int = 64,
+        cancel_check: Callable[[], None] | None = None,
     ) -> int:
         """Embed missing or stale chunks from the provenance table."""
         if batch_size < 1:
@@ -126,8 +127,12 @@ class LocalVectorIndex:
 
         indexed = 0
         for start in range(0, len(pending), batch_size):
+            if cancel_check is not None:
+                cancel_check()
             batch = pending[start : start + batch_size]
             vectors = provider.embed([text for _, text, _ in batch])
+            if cancel_check is not None:
+                cancel_check()
             if len(vectors) != len(batch):
                 raise VectorIndexError(
                     "Embedding provider returned a different number of vectors than inputs"
@@ -135,6 +140,8 @@ class LocalVectorIndex:
 
             with self.connection:
                 for (chunk_id, _text, digest), raw_vector in zip(batch, vectors):
+                    if cancel_check is not None:
+                        cancel_check()
                     vector = normalize(raw_vector)
                     if not vector:
                         raise VectorIndexError("Embedding vectors must not be empty")

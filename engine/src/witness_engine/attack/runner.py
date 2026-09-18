@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Callable
 from uuid import uuid4
 
 from ..evaluation import EvalConfig, EvalDataset, EvalRunner
@@ -10,6 +11,7 @@ from ..evaluation.runner import corpus_fingerprint
 from ..ids import stable_id
 from ..pipeline import index_document
 from ..retrieval import EmbeddingProvider, LocalEvidenceIndex, LocalVectorIndex
+from ..tasks import OperationCancelled
 from .models import (
     AttackCaseComparison,
     AttackInvariant,
@@ -122,9 +124,15 @@ class AttackRunner:
         artifacts: Path,
         lexical: LocalEvidenceIndex,
         vectors: LocalVectorIndex,
+        *,
+        cancel_check: Callable[[], None] | None = None,
     ) -> None:
         for mutation in manifest.mutations:
+            if cancel_check is not None:
+                cancel_check()
             for copy_index in range(mutation.copies):
+                if cancel_check is not None:
+                    cancel_check()
                 stem = stable_id(
                     "attack-artifact",
                     manifest.fingerprint,
@@ -151,6 +159,7 @@ class AttackRunner:
                         + "/"
                         + str(copy_index)
                     ),
+                    cancel_check=cancel_check,
                 )
 
     def _evaluate_invariant(
@@ -278,7 +287,11 @@ class AttackRunner:
         manifest: AttackManifest,
         dataset: EvalDataset,
         config: EvalConfig,
+        *,
+        cancel_check: Callable[[], None] | None = None,
     ) -> AttackRunResult:
+        if cancel_check is not None:
+            cancel_check()
         self.store.register_manifest(manifest)
         canonical_before = corpus_fingerprint(self.canonical)
         attack_run_id = stable_id(
@@ -304,7 +317,10 @@ class AttackRunner:
                 snapshot.artifacts,
                 attacked_lexical,
                 attacked_vectors,
+                cancel_check=cancel_check,
             )
+            if cancel_check is not None:
+                cancel_check()
             attacked_fingerprint = corpus_fingerprint(attacked_lexical)
             started_at = self.store.start_run(
                 attack_run_id=attack_run_id,
@@ -321,13 +337,15 @@ class AttackRunner:
                 self.canonical,
                 self.canonical_vectors,
                 self.embedding_provider,
-            ).run(dataset, config)
+            ).run(dataset, config, cancel_check=cancel_check)
             attacked = EvalRunner(
                 attacked_lexical,
                 attacked_vectors,
                 self.embedding_provider,
-            ).run(dataset, config)
+            ).run(dataset, config, cancel_check=cancel_check)
 
+            if cancel_check is not None:
+                cancel_check()
             canonical_after = corpus_fingerprint(self.canonical)
             clean_cases = _case_map(clean)
             attacked_cases = _case_map(attacked)
@@ -467,6 +485,10 @@ class AttackRunner:
             self.store.complete_run(result)
             persisted = self.store.load_run(attack_run_id)
             return persisted
+        except OperationCancelled:
+            if started_at:
+                self.store.cancel_run(attack_run_id)
+            raise
         except Exception:
             if started_at:
                 self.store.fail_run(attack_run_id)
