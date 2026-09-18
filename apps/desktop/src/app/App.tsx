@@ -104,7 +104,7 @@ export function App() {
       await refreshSources();
       setSourcePath("");
       setStatus(
-        "Source indexed into lexical, dense, temporal, hierarchy, and graph projections.",
+        "Source indexed into lexical, dense, temporal, hierarchy, graph, and visual projections.",
       );
     } catch (reason) {
       setError(String(reason));

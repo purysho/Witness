@@ -199,8 +199,6 @@ def search_hybrid_evidence(
     vector_index: LocalVectorIndex,
     embedding_provider: EmbeddingProvider,
     *,
-    visual_index: LocalVisualVectorIndex | None = None,
-    visual_embedding_provider: VisualEmbeddingProvider | None = None,
     limit: int = 10,
     candidate_pool: int = 30,
     rrf_k: int = 60,
