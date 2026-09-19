@@ -31,6 +31,8 @@ Expected SHA-256:
 
 The v1.0.0 installer is not code-signed yet, so Windows may show a reputation warning. Code signing and update delivery are V1.1 distribution-polish work.
 
+**Updates are manual.** Witness does not contact GitHub or another update service automatically. New releases are downloaded explicitly from GitHub Releases and can be verified with the published SHA-256 checksums. Automatic updating remains disabled until a signed update channel can preserve the same local-first and fail-closed guarantees.
+
 ## Core ideas
 
 - **Evidence before fluency.** The system may abstain when the corpus does not justify an answer.
@@ -86,6 +88,8 @@ Witness is an **evidence and retrieval workbench**, not a general-purpose autono
 - [`docs/evaluation.md`](docs/evaluation.md) — RAG Lab datasets, metrics, snapshots, comparison, and export semantics
 - [`docs/attack-lab.md`](docs/attack-lab.md) — Attack Lab isolation, manifests, invariants, reproducibility, and export
 - [`docs/multimodal.md`](docs/multimodal.md) — visual evidence identity, page-region provenance, asset storage, retrieval, evaluation, and viewer semantics
+- [`docs/distribution.md`](docs/distribution.md) — Windows signing, SmartScreen, release metadata, and update policy
+- [`CHANGELOG.md`](CHANGELOG.md) — release-by-release product changes
 
 ## Status
 
