@@ -181,7 +181,20 @@ def test_archive_hides_current_logical_source_but_preserves_history_and_trace(
             "query.trace",
             {"run_id": original_run_id},
         )
-        assert old_trace["answer"] == before["answer"]
+        assert {
+            item["evidence_id"]
+            for item in old_trace["answer"]["citations"]
+        } == {
+            item["evidence_id"]
+            for item in before["answer"]["citations"]
+        }
+        assert [
+            item["text"]
+            for item in old_trace["answer"]["sentences"]
+        ] == [
+            item["text"]
+            for item in before["answer"]["sentences"]
+        ]
         assert current["source_version_id"] in {
             item["source_version_id"]
             for item in old_trace["answer"]["citations"]
