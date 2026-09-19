@@ -146,6 +146,14 @@ def _similarity(left: str, right: str) -> float:
     return len(a & b) / len(a | b)
 
 
+def _claim_relevant_to_query(query: str, claim: str) -> bool:
+    query_topics = _topic_tokens(query)
+    claim_topics = _topic_tokens(claim)
+    if not query_topics or not claim_topics:
+        return False
+    return bool(query_topics & claim_topics)
+
+
 def _contradiction_reason(left: str, right: str) -> str | None:
     similarity = _similarity(left, right)
     if similarity < 0.5:
@@ -356,6 +364,8 @@ class EvidenceReconciler:
     def reconcile(
         self,
         candidates: tuple[RetrievalCandidate, ...],
+        *,
+        query: str | None = None,
     ) -> ReconciliationResult:
         observations = self._observations(candidates)
         relations: list[EvidenceRelationRecord] = []
@@ -403,6 +413,11 @@ class EvidenceReconciler:
 
             contradiction = _contradiction_reason(left.text, right.text)
             if contradiction is None:
+                continue
+            if query is not None and not (
+                _claim_relevant_to_query(query, left.text)
+                and _claim_relevant_to_query(query, right.text)
+            ):
                 continue
 
             supersession = self._supersession_order(left, right)
