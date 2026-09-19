@@ -211,10 +211,23 @@ def _query(service: RpcService) -> dict[str, object]:
         "query.run",
         {"question": "What marker is recorded in stress document 000000?"},
     )
+    evidence = result["context"]["evidence"]
+    citations = result["answer"]["citations"]
+    if not evidence:
+        raise RuntimeError("Stress query returned no evidence")
+    if not citations:
+        raise RuntimeError("Stress query returned no citations")
+    if not any(
+        "STRESS-000000" in str(item.get("text", ""))
+        for item in evidence
+    ):
+        raise RuntimeError(
+            "Stress query did not retrieve the deterministic target marker"
+        )
     return {
         "seconds": time.perf_counter() - started,
         "evidence_count": int(result["sufficiency"]["evidence_count"]),
-        "citation_count": len(result["answer"]["citations"]),
+        "citation_count": len(citations),
         "run_id": result["run_id"],
     }
 
@@ -226,8 +239,32 @@ def _repair_check(service: RpcService) -> dict[str, object]:
     with service.lexical.connection:
         service.lexical.connection.execute("DELETE FROM indexed_chunks_fts")
     broken = service.handle("workspace.health", {})
+    if healthy["status"] != "healthy":
+        raise RuntimeError(
+            f"Stress workspace was unhealthy before repair test: {healthy}"
+        )
+    if broken["status"] != "repairable":
+        raise RuntimeError(
+            f"Expected repairable projection damage, got: {broken}"
+        )
+    if broken["protected_state_fingerprint"] != protected_before:
+        raise RuntimeError("Projection damage changed protected state")
+
     started = time.perf_counter()
     repaired = service.handle("workspace.repair", {})
+    if repaired["after"]["status"] != "healthy":
+        raise RuntimeError(
+            f"Workspace repair did not restore healthy state: {repaired}"
+        )
+    if not repaired["protected_state_unchanged"]:
+        raise RuntimeError("Workspace repair changed protected state")
+    if (
+        repaired["after"]["protected_state_fingerprint"]
+        != protected_before
+    ):
+        raise RuntimeError(
+            "Workspace repair changed protected-state fingerprint"
+        )
     return {
         "status_before": broken["status"],
         "status_after": repaired["after"]["status"],
@@ -282,6 +319,18 @@ def _cancellation_rollback(root: Path) -> dict[str, object]:
 
         after = _counts(service)
         health = service.handle("workspace.health", {})
+        if not cancelled:
+            raise RuntimeError(
+                "Cancellation stress did not reach a cancellation checkpoint"
+            )
+        if before != after:
+            raise RuntimeError(
+                "Cancelled import left partial source/chunk state behind"
+            )
+        if health["status"] != "healthy":
+            raise RuntimeError(
+                f"Cancellation rollback left unhealthy state: {health}"
+            )
         return {
             "cancelled": cancelled,
             "checks": checks,
@@ -340,7 +389,15 @@ def run(args: argparse.Namespace) -> dict[str, object]:
             import_seconds = time.perf_counter() - import_started
             _, python_peak_alloc = tracemalloc.get_traced_memory()
             source_versions, chunks = _counts(service)
+            if source_versions != len(paths):
+                raise RuntimeError(
+                    f"Expected {len(paths)} source versions, got {source_versions}"
+                )
             health_after_import = service.handle("workspace.health", {})
+            if health_after_import["status"] != "healthy":
+                raise RuntimeError(
+                    f"Workspace unhealthy after stress import: {health_after_import}"
+                )
             query = _query(service)
             repair = _repair_check(service)
         finally:
@@ -357,6 +414,10 @@ def run(args: argparse.Namespace) -> dict[str, object]:
                 reopened.handle("workspace.open", {"path": str(workspace)})
                 open_seconds = time.perf_counter() - open_started
                 health = reopened.handle("workspace.health", {})
+                if health["status"] != "healthy":
+                    raise RuntimeError(
+                        f"Workspace unhealthy after reopen: {health}"
+                    )
                 query_result = _query(reopened)
                 reopen.append(
                     {
