@@ -80,3 +80,41 @@ measurements such as:
 
 Keep raw baseline JSON out of the repository unless it represents a deliberate,
 documented release benchmark.
+
+
+## V1.1 baseline — 2026-09-19
+
+The first default Windows benchmark completed successfully in GitHub Actions
+(Stress Benchmark run `35431097813`).
+
+| Measurement | Result |
+| --- | ---: |
+| Files | 2,000 |
+| Large documents | 40 |
+| Source versions | 2,000 |
+| Chunks | 8,569 |
+| Workspace database | 49,999,872 bytes |
+| Corpus generation | 11.42 s |
+| Import | 110.91 s |
+| Import throughput | 18.03 files/s |
+| Initial query | 0.82 s |
+| Reopen time | 0.0115–0.0127 s |
+| Reopen query | 0.231–0.253 s |
+| Derived-index repair | 33.58 s |
+| Peak traced Python allocations | 3,673,385 bytes |
+
+Correctness checks all passed:
+
+- workspace health remained `healthy` after import;
+- query retrieval returned 10 evidence items;
+- cancellation occurred after 650 checks and rolled back completely;
+- the cancellation workspace remained healthy;
+- deliberately removed FTS state was detected as `repairable`;
+- repair returned the workspace to `healthy`;
+- the protected-state fingerprint was unchanged by repair;
+- five consecutive reopen/query cycles remained healthy.
+
+The 33.58-second repair time is the clearest optimization candidate from this
+baseline, but it is not a V1.1 correctness blocker. Future performance work
+should compare against this report rather than introducing an unmeasured
+rewrite.
