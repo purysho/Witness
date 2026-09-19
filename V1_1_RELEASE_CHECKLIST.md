@@ -15,7 +15,7 @@ release candidate commit.
 | 4 · Large corpus | 2,000-file baseline, cancellation, repair, reopen cycles | Complete |
 | 5 · Quality | Fixed regression corpus; final routed baseline passes 8/8 | Complete |
 | 6 · Semantic provider | Optional local-only semantic projection; hash baseline preserved | Complete |
-| 7 · Distribution | Metadata guards, release notes/changelog, signing/update policy | In final verification |
+| 7 · Distribution | Metadata guards, release notes/changelog, signing/update policy | Complete |
 
 ## Compatibility
 
@@ -71,7 +71,7 @@ and corpus fingerprint
 
 Before tagging `v1.1.0`:
 
-- [ ] Set every release-facing version to `1.1.0`:
+- [x] Set every release-facing version to `1.1.0`:
   - Tauri app;
   - desktop npm package;
   - Rust desktop crate;
@@ -79,9 +79,9 @@ Before tagging `v1.1.0`:
   - Python runtime `__version__`.
 - [ ] `python tools/check-version-metadata.py` passes.
 - [ ] `python tools/check-distribution-metadata.py` passes.
-- [ ] Draft marker is removed from `RELEASE_NOTES_v1.1.0.md`.
-- [ ] `CHANGELOG.md` moves V1.1 from Unreleased to `1.1.0`.
-- [ ] README download/checksum/release-note links target `v1.1.0`.
+- [x] Draft marker is removed from `RELEASE_NOTES_v1.1.0.md`.
+- [x] `CHANGELOG.md` moves V1.1 from Unreleased to `1.1.0`.
+- [x] README download/checksum/release-note links target `v1.1.0`.
 - [ ] Engine tests · Ubuntu pass.
 - [ ] Engine tests · Windows pass.
 - [ ] Generated RPC contracts pass.
