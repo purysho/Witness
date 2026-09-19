@@ -22,7 +22,8 @@ Verified from the published repository/release state:
 - first-run demo and fail-closed derived-index repair already exist;
 - the original audit found no normal-user workspace backup/restore flow; this
   gap is now closed on the V1.1 branch;
-- there is no dedicated large-corpus stress/benchmark suite yet;
+- the original audit found no dedicated large-corpus stress/benchmark suite;
+  this gap is now closed on the V1.1 branch;
 - RAG Lab provides the right mechanism for quality work, so retrieval tuning
   should be benchmark-driven rather than speculative;
 - deterministic offline providers remain the V1 baseline;
@@ -185,13 +186,16 @@ Exit gate:
 - reopen/repair behavior remains deterministic;
 - baseline performance measurements are captured for future regression checks.
 
-**Status:** first robustness chunk implemented. A reproducible mixed-format stress
-harness now generates Markdown/text/HTML/CSV/source/DOCX/PPTX/XLSX/searchable
-PDF corpora, records import/reopen/query/repair/memory measurements, validates
-derived-index repair and cancellation rollback, and has passed the 18-file smoke
-on both Ubuntu and Windows engine suites. A manual Windows Stress Benchmark
-workflow captures full-run JSON artifacts. Slice 4 remains open until at least
-one representative large (default 2,000-file) baseline is executed and reviewed.
+**Status:** complete and verified on the V1.1 branch. The default Windows
+baseline completed successfully with 2,000 source files across all nine stress
+formats, including 40 enlarged Office/PDF documents. It produced 2,000 source
+versions and 8,569 chunks in a ~50 MB workspace, imported at ~18 files/second,
+remained healthy, rolled back a sustained-ingestion cancellation cleanly,
+repaired a deliberately broken derived FTS projection without changing the
+protected-state fingerprint, and passed five reopen/query cycles. Baseline
+artifact: Stress Benchmark run 35431097813. Repair took ~33.6 seconds on the
+hosted Windows runner and is retained as a performance baseline rather than a
+correctness failure.
 
 ---
 
