@@ -82,3 +82,31 @@ def test_deduplicates_equally_relevant_duplicate_evidence():
     assert len(generated.sentences) == 1
     assert generated.sentences[0].text == sentence
     assert generated.sentences[0].evidence_ids == ("one",)
+
+
+def test_historical_exact_lookup_keeps_best_ranked_version_when_relevance_ties():
+    provider = DeterministicExtractiveGenerationProvider()
+    context = _context(
+        "What port did the API use in 2025?",
+        (
+            _evidence(
+                "historical",
+                "# API Handbook — 2025\n\n"
+                "The public API listens on port 4100.",
+                1,
+            ),
+            _evidence(
+                "current",
+                "# API Handbook — 2026\n\n"
+                "The current public API listens on port 5200.",
+                2,
+            ),
+        ),
+    )
+
+    generated = provider.generate(context)
+
+    assert [item.text for item in generated.sentences] == [
+        "The public API listens on port 4100."
+    ]
+    assert generated.sentences[0].evidence_ids == ("historical",)
