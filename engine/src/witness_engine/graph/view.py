@@ -51,6 +51,7 @@ def build_graph_snapshot(index: LocalEvidenceIndex, *, limit: int = 160) -> Grap
     for row in connection.execute(
         """SELECT source_version_id, title, source_path, valid_from, valid_to
            FROM source_version_metadata
+           WHERE archived_at IS NULL
            ORDER BY valid_from DESC, source_version_id LIMIT ?""",
         (limit,),
     ).fetchall():
@@ -63,7 +64,19 @@ def build_graph_snapshot(index: LocalEvidenceIndex, *, limit: int = 160) -> Grap
         })
 
     for row in connection.execute(
-        "SELECT claim_id, text FROM graph_claims ORDER BY claim_id LIMIT ?",
+        """
+        SELECT DISTINCT c.claim_id, c.text
+        FROM graph_claims AS c
+        JOIN graph_claim_evidence AS ge
+          ON ge.claim_id = c.claim_id
+        JOIN indexed_chunks AS chunk
+          ON chunk.chunk_id = ge.chunk_id
+        JOIN source_version_metadata AS source
+          ON source.source_version_id = chunk.source_version_id
+        WHERE source.archived_at IS NULL
+        ORDER BY c.claim_id
+        LIMIT ?
+        """,
         (limit,),
     ).fetchall():
         node_id = f"claim:{row['claim_id']}"
@@ -72,7 +85,21 @@ def build_graph_snapshot(index: LocalEvidenceIndex, *, limit: int = 160) -> Grap
         })
 
     for row in connection.execute(
-        "SELECT entity_id, canonical_name FROM graph_entities ORDER BY canonical_name, entity_id LIMIT ?",
+        """
+        SELECT DISTINCT e.entity_id, e.canonical_name
+        FROM graph_entities AS e
+        JOIN graph_claim_entities AS ce
+          ON ce.entity_id = e.entity_id
+        JOIN graph_claim_evidence AS ge
+          ON ge.claim_id = ce.claim_id
+        JOIN indexed_chunks AS chunk
+          ON chunk.chunk_id = ge.chunk_id
+        JOIN source_version_metadata AS source
+          ON source.source_version_id = chunk.source_version_id
+        WHERE source.archived_at IS NULL
+        ORDER BY e.canonical_name, e.entity_id
+        LIMIT ?
+        """,
         (limit,),
     ).fetchall():
         node_id = f"entity:{row['entity_id']}"
@@ -83,10 +110,13 @@ def build_graph_snapshot(index: LocalEvidenceIndex, *, limit: int = 160) -> Grap
     evidence_rows = connection.execute(
         """SELECT DISTINCT c.chunk_id, c.text, c.source_version_id, c.locator
            FROM indexed_chunks AS c
+           JOIN source_version_metadata AS s
+             ON s.source_version_id = c.source_version_id
            LEFT JOIN graph_claim_evidence AS ge ON ge.chunk_id = c.chunk_id
            LEFT JOIN evidence_relations AS er
              ON er.left_chunk_id = c.chunk_id OR er.right_chunk_id = c.chunk_id
-           WHERE ge.chunk_id IS NOT NULL OR er.relation_id IS NOT NULL
+           WHERE s.archived_at IS NULL
+             AND (ge.chunk_id IS NOT NULL OR er.relation_id IS NOT NULL)
            ORDER BY c.chunk_id LIMIT ?""",
         (limit,),
     ).fetchall()

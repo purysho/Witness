@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from ..ids import stable_id
+from .eligibility import eligible_source_version_ids
 from .index import LocalEvidenceIndex
 from .models import RetrievalCandidate
 
@@ -72,7 +73,8 @@ class LocalTemporalIndex:
                 valid_from TEXT NOT NULL,
                 valid_to TEXT,
                 supersedes_source_version_id TEXT,
-                superseded_by_source_version_id TEXT
+                superseded_by_source_version_id TEXT,
+                archived_at TEXT
             );
 
             CREATE INDEX IF NOT EXISTS idx_source_versions_logical
@@ -81,6 +83,123 @@ class LocalTemporalIndex:
                 ON source_version_metadata(valid_from, valid_to);
             """
         )
+        self._migrate_lifecycle_columns()
+
+    def _migrate_lifecycle_columns(self) -> None:
+        columns = {
+            str(row["name"])
+            for row in self.connection.execute(
+                "PRAGMA table_info(source_version_metadata)"
+            ).fetchall()
+        }
+        if "archived_at" not in columns:
+            with self.connection:
+                self.connection.execute(
+                    "ALTER TABLE source_version_metadata ADD COLUMN archived_at TEXT"
+                )
+
+    def archive_source_version(self, source_version_id: str) -> str:
+        row = self.connection.execute(
+            """
+            SELECT source_version_id
+            FROM source_version_metadata
+            WHERE source_version_id = ?
+            """,
+            (source_version_id,),
+        ).fetchone()
+        if row is None:
+            raise KeyError(f"Unknown source version: {source_version_id}")
+        archived_at = _iso(None)
+        with self.connection:
+            self.connection.execute(
+                """
+                UPDATE source_version_metadata
+                SET archived_at = COALESCE(archived_at, ?)
+                WHERE source_version_id = ?
+                """,
+                (archived_at, source_version_id),
+            )
+        current = self.connection.execute(
+            """
+            SELECT archived_at
+            FROM source_version_metadata
+            WHERE source_version_id = ?
+            """,
+            (source_version_id,),
+        ).fetchone()
+        return str(current["archived_at"])
+
+    def restore_source_version(self, source_version_id: str) -> None:
+        row = self.connection.execute(
+            """
+            SELECT source_version_id
+            FROM source_version_metadata
+            WHERE source_version_id = ?
+            """,
+            (source_version_id,),
+        ).fetchone()
+        if row is None:
+            raise KeyError(f"Unknown source version: {source_version_id}")
+        with self.connection:
+            self.connection.execute(
+                """
+                UPDATE source_version_metadata
+                SET archived_at = NULL
+                WHERE source_version_id = ?
+                """,
+                (source_version_id,),
+            )
+
+    def source_detail(self, source_version_id: str) -> dict:
+        row = self.connection.execute(
+            """
+            SELECT
+                source_version_id, logical_source_id, source_path, title,
+                media_type, observed_at, valid_from, valid_to,
+                supersedes_source_version_id,
+                superseded_by_source_version_id, archived_at
+            FROM source_version_metadata
+            WHERE source_version_id = ?
+            """,
+            (source_version_id,),
+        ).fetchone()
+        if row is None:
+            raise KeyError(f"Unknown source version: {source_version_id}")
+
+        chain = self.connection.execute(
+            """
+            SELECT
+                source_version_id, valid_from, valid_to,
+                supersedes_source_version_id,
+                superseded_by_source_version_id, archived_at
+            FROM source_version_metadata
+            WHERE logical_source_id = ?
+            ORDER BY valid_from ASC, source_version_id ASC
+            """,
+            (row["logical_source_id"],),
+        ).fetchall()
+        chunk_count = int(
+            self.connection.execute(
+                """
+                SELECT COUNT(*)
+                FROM indexed_chunks
+                WHERE source_version_id = ?
+                """,
+                (source_version_id,),
+            ).fetchone()[0]
+        )
+        return {
+            **dict(row),
+            "archived": row["archived_at"] is not None,
+            "chunk_count": chunk_count,
+            "version_chain": [
+                {
+                    **dict(item),
+                    "archived": item["archived_at"] is not None,
+                }
+                for item in chain
+            ],
+        }
 
     def register_source_version(
         self,
@@ -184,6 +303,7 @@ class LocalTemporalIndex:
             SELECT source_version_id
             FROM source_version_metadata
             WHERE superseded_by_source_version_id IS NULL
+              AND archived_at IS NULL
             ORDER BY logical_source_id, source_version_id
             """
         ).fetchall()
@@ -264,11 +384,14 @@ class LocalTemporalIndex:
             reasons.append("historical language excludes current unsuperseded versions")
         else:
             mode = "all"
-            rows = self.connection.execute(
-                "SELECT source_version_id FROM source_version_metadata ORDER BY source_version_id"
-            ).fetchall()
-            versions = tuple(row["source_version_id"] for row in rows)
-            reasons.append("no point-in-time constraint; all registered versions are eligible")
+            versions = eligible_source_version_ids(
+                self.connection,
+                None,
+                include_archived=False,
+            ) or ()
+            reasons.append(
+                "no point-in-time constraint; active registered versions are eligible"
+            )
 
         return TemporalSelection(
             mode=mode,
@@ -295,12 +418,24 @@ class LocalTemporalIndex:
                 content_query,
                 limit=limit,
                 source_version_ids=selection.source_version_ids,
+                include_archived=selection.mode in {
+                    "year",
+                    "before",
+                    "after",
+                    "historical",
+                },
             )
         else:
             base = self.index.candidates_for_source_versions(
                 selection.source_version_ids,
                 limit=limit,
                 method="temporal-version-scan",
+                include_archived=selection.mode in {
+                    "year",
+                    "before",
+                    "after",
+                    "historical",
+                },
             )
 
         candidates = tuple(

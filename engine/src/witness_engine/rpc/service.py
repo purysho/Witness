@@ -67,6 +67,9 @@ ALLOWED_METHODS = frozenset(
         "demo.load",
         "source.import",
         "source.list",
+        "source.detail",
+        "source.archive",
+        "source.restore",
         "query.run",
         "query.trace",
         "graph.snapshot",
@@ -380,12 +383,90 @@ class RpcService:
                 source_version_id, logical_source_id, source_path, title,
                 media_type, valid_from, valid_to,
                 supersedes_source_version_id,
-                superseded_by_source_version_id
+                superseded_by_source_version_id, archived_at
             FROM source_version_metadata
             ORDER BY valid_from DESC, source_version_id DESC
             """
         ).fetchall()
-        return [dict(row) for row in rows]
+        return [
+            {
+                **dict(row),
+                "archived": row["archived_at"] is not None,
+            }
+            for row in rows
+        ]
+
+    @staticmethod
+    def _required_source_version_id(
+        params: dict[str, Any],
+        method: str,
+    ) -> str:
+        source_version_id = str(
+            params.get("source_version_id", "")
+        ).strip()
+        if not source_version_id:
+            raise RpcServiceError(
+                "invalid_params",
+                f"{method} requires source_version_id",
+            )
+        return source_version_id
+
+    def _source_detail(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        lexical, _ = self._require_workspace()
+        source_version_id = self._required_source_version_id(
+            params,
+            "source.detail",
+        )
+        try:
+            return LocalTemporalIndex(lexical).source_detail(
+                source_version_id
+            )
+        except KeyError as exc:
+            raise RpcServiceError(
+                "source_not_found",
+                str(exc),
+            ) from exc
+
+    def _archive_source(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        lexical, _ = self._require_workspace()
+        source_version_id = self._required_source_version_id(
+            params,
+            "source.archive",
+        )
+        temporal = LocalTemporalIndex(lexical)
+        try:
+            temporal.archive_source_version(source_version_id)
+            return temporal.source_detail(source_version_id)
+        except KeyError as exc:
+            raise RpcServiceError(
+                "source_not_found",
+                str(exc),
+            ) from exc
+
+    def _restore_source(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        lexical, _ = self._require_workspace()
+        source_version_id = self._required_source_version_id(
+            params,
+            "source.restore",
+        )
+        temporal = LocalTemporalIndex(lexical)
+        try:
+            temporal.restore_source_version(source_version_id)
+            return temporal.source_detail(source_version_id)
+        except KeyError as exc:
+            raise RpcServiceError(
+                "source_not_found",
+                str(exc),
+            ) from exc
 
     def _import_source(
         self,
@@ -881,6 +962,12 @@ class RpcService:
             return {
                 "sources": self._source_rows(),
             }
+        if method == "source.detail":
+            return self._source_detail(params)
+        if method == "source.archive":
+            return self._archive_source(params)
+        if method == "source.restore":
+            return self._restore_source(params)
         if method == "query.run":
             return self._run_query(params)
         if method == "query.trace":
