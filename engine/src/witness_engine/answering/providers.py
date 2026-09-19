@@ -138,13 +138,29 @@ class DeterministicExtractiveGenerationProvider:
 
         features = analyze_query(context.question)
         scored.sort(key=lambda row: (-row[0], -row[1], row[2]))
-        if scored and not features.broad_summary:
-            best = scored[0][0]
-            if best > 0:
-                scored = [
-                    row for row in scored
-                    if row[0] >= best * 0.75
-                ]
+        temporal_multi = bool(
+            set(features.temporal_signals)
+            & {
+                "change",
+                "changed",
+                "earlier",
+                "history",
+                "later",
+                "previous",
+                "previously",
+                "versions",
+            }
+        )
+        multi_evidence = (
+            features.broad_summary
+            or features.comparison
+            or temporal_multi
+        )
+        target_sentences = (
+            max(self.max_sentences, 1)
+            if multi_evidence
+            else 1
+        )
 
         sentences: list[GeneratedSentence] = []
         seen_text: set[str] = set()
@@ -154,7 +170,7 @@ class DeterministicExtractiveGenerationProvider:
                 continue
             seen_text.add(normalized)
             sentences.append(GeneratedSentence(text, (evidence_id,)))
-            if len(sentences) >= max(self.max_sentences, 1):
+            if len(sentences) >= target_sentences:
                 break
 
         if not sentences:
