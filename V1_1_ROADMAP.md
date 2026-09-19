@@ -20,7 +20,8 @@ Verified from the published repository/release state:
 - several old phase/release branches remain. They are cleanup candidates, but
   branch deletion is intentionally not treated as product work;
 - first-run demo and fail-closed derived-index repair already exist;
-- a normal-user workspace backup/restore flow does not yet exist;
+- the original audit found no normal-user workspace backup/restore flow; this
+  gap is now closed on the V1.1 branch;
 - there is no dedicated large-corpus stress/benchmark suite yet;
 - RAG Lab provides the right mechanism for quality work, so retrieval tuning
   should be benchmark-driven rather than speculative;
@@ -126,6 +127,11 @@ Exit gate:
 - a clean-machine user can complete the evidence loop without repository docs or
   developer tooling.
 
+**Status:** implemented and verified on the V1.1 branch. The installed Windows
+smoke now covers install -> launch -> bundled-engine RPC -> normal desktop exit
+-> sidecar termination -> uninstall, and the first-run/empty-workspace UI has
+explicit create/open/demo/import guidance.
+
 ---
 
 ## Slice 3 — Workspace backup, restore, and recovery UX
@@ -149,6 +155,12 @@ Exit gate:
   QueryRun/Trace history, Lab/Attack records, and provider identifiers;
 - checksums detect tampering;
 - malformed/path-traversal archives fail closed without modifying destination.
+
+**Status:** implemented and verified on the V1.1 branch. Backups contain only a
+versioned manifest plus a coherent SQLite backup, verify checksums and the
+protected-state fingerprint, reject unexpected/path-traversal entries and
+non-empty restore destinations, and are exposed through the desktop Backup /
+Restore flow.
 
 ---
 
