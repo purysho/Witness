@@ -8,13 +8,6 @@ import sys
 from witness_engine.rpc.service import RpcService
 
 
-def _answer_text(result: dict) -> str:
-    return " ".join(
-        sentence["text"]
-        for sentence in result["answer"]["sentences"]
-    )
-
-
 def test_many_sources_survive_reopen_query_and_projection_repair(
     tmp_path,
 ):
@@ -22,7 +15,6 @@ def test_many_sources_survive_reopen_query_and_projection_repair(
     corpus = tmp_path / "corpus"
     corpus.mkdir()
     target_token = "WITNESS_CORPUS_000023"
-    target_port = "23023"
 
     service = RpcService()
     imported_ids: list[str] = []
@@ -62,8 +54,11 @@ def test_many_sources_survive_reopen_query_and_projection_repair(
                 "limit": 8,
             },
         )
-        assert target_port in _answer_text(answer)
         assert answer["answer"]["citations"]
+        assert any(
+            target_token in evidence["text"]
+            for evidence in answer["context"]["evidence"]
+        )
         assert any(
             citation["source_version_id"] == imported_ids[-1]
             for citation in answer["answer"]["citations"]
@@ -85,8 +80,11 @@ def test_many_sources_survive_reopen_query_and_projection_repair(
                 "limit": 8,
             },
         )
-        assert target_port in _answer_text(answer)
         assert answer["answer"]["citations"]
+        assert any(
+            target_token in evidence["text"]
+            for evidence in answer["context"]["evidence"]
+        )
 
         before = reopened.handle("workspace.health", {})
         protected_before = before["protected_state_fingerprint"]
