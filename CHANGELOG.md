@@ -2,7 +2,7 @@
 
 All notable Witness changes are recorded here.
 
-## [Unreleased] — V1.1
+## [1.1.0] — 2026-09-19
 
 ### Added
 - Source-version details, immutable version-chain inspection, archive/restore, and
