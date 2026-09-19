@@ -1,6 +1,8 @@
 param(
     [Parameter(Mandatory = $true)]
-    [string]$Installer
+    [string]$Installer,
+
+    [switch]$ExerciseEvidenceLoop
 )
 
 $ErrorActionPreference = "Stop"
@@ -29,6 +31,18 @@ $app = Get-ChildItem -Path $installDir -Recurse -File -Filter "*.exe" | Where-Ob
 } | Sort-Object Length -Descending | Select-Object -First 1
 if (-not $app) {
     throw "Could not locate the installed Witness desktop executable"
+}
+
+if ($ExerciseEvidenceLoop) {
+    $sidecarSmoke = Join-Path $PSScriptRoot "smoke-sidecar.py"
+    if (-not (Test-Path $sidecarSmoke)) {
+        throw "Could not locate installed-engine evidence-loop smoke: $sidecarSmoke"
+    }
+    Write-Host "Running evidence loop against installed bundled engine: $($engine.FullName)"
+    & python $sidecarSmoke --engine $engine.FullName
+    if ($LASTEXITCODE -ne 0) {
+        throw "Installed bundled-engine evidence-loop smoke exited with code $LASTEXITCODE"
+    }
 }
 
 $readyFile = Join-Path $root ("witness-engine-ready-" + [Guid]::NewGuid().ToString("N") + ".txt")

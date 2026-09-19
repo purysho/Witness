@@ -1,0 +1,58 @@
+name: Performance regression
+description: Report a measured slowdown or resource regression in a released Witness build.
+title: "[Performance] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Performance reports need measurements. The V1.1 observation baseline is documented in POST_V1_1_OBSERVATION.md.
+
+  - type: dropdown
+    id: version
+    attributes:
+      label: Witness version
+      options:
+        - v1.1.0
+        - v1.0.0
+        - Other / development build
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and hardware
+      placeholder: e.g. Windows 11 24H2, Ryzen 7, 32 GB RAM, SSD
+    validations:
+      required: true
+
+  - type: textarea
+    id: workload
+    attributes:
+      label: Workload
+      description: Include source count, approximate sizes, formats, chunk count/database size when known, and the operation measured.
+    validations:
+      required: true
+
+  - type: textarea
+    id: measurement
+    attributes:
+      label: Measurements
+      description: Include elapsed time, repeated-run range, and prior/baseline measurement if available.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: User impact
+      description: Explain whether the slowdown blocks normal use, causes timeouts/failures, or is only an optimization opportunity.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true

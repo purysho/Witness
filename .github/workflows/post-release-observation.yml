@@ -1,0 +1,82 @@
+name: Post-release observation
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/post-release-observation.yml'
+      - 'POST_V1_1_OBSERVATION.md'
+      - 'tools/smoke-installed.ps1'
+  workflow_dispatch:
+
+jobs:
+  public-windows-release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download and verify published v1.1.0 assets
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $releaseDir = Join-Path $env:RUNNER_TEMP "witness-v1.1.0-public"
+          New-Item -ItemType Directory -Force -Path $releaseDir | Out-Null
+
+          $installer = Join-Path $releaseDir "Witness_1.1.0_x64-setup.exe"
+          $sums = Join-Path $releaseDir "SHA256SUMS.txt"
+          $base = "https://github.com/purysho/Witness/releases/download/v1.1.0"
+
+          $download = [Diagnostics.Stopwatch]::StartNew()
+          Invoke-WebRequest "$base/Witness_1.1.0_x64-setup.exe" -OutFile $installer
+          Invoke-WebRequest "$base/SHA256SUMS.txt" -OutFile $sums
+          $download.Stop()
+
+          $expectedHash = "d092c31bc2888fa8d4d35e2cb4a26af7a925fe4a4bb96c496e4524f952fc267c"
+          $expectedBytes = 31615762
+          $actualBytes = (Get-Item $installer).Length
+          if ($actualBytes -ne $expectedBytes) {
+            throw "Published installer size changed: expected $expectedBytes bytes, got $actualBytes"
+          }
+
+          $publishedLine = Get-Content $sums | Where-Object { $_ -match "Witness_1\.1\.0_x64-setup\.exe" } | Select-Object -First 1
+          if (-not $publishedLine) {
+            throw "SHA256SUMS.txt does not contain the v1.1.0 installer"
+          }
+          $publishedHash = (($publishedLine -split "\s+")[0]).ToLower()
+          if ($publishedHash -ne $expectedHash) {
+            throw "Published checksum file differs from the recorded v1.1.0 hash"
+          }
+
+          $actualHash = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
+          if ($actualHash -ne $expectedHash) {
+            throw "Downloaded installer hash mismatch: $actualHash"
+          }
+
+          "INSTALLER_PATH=$installer" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "DOWNLOAD_SECONDS=$([Math]::Round($download.Elapsed.TotalSeconds, 3))" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "ASSET_BYTES=$actualBytes" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "ASSET_SHA256=$actualHash" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Exercise exact published Windows package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $smoke = [Diagnostics.Stopwatch]::StartNew()
+          ./tools/smoke-installed.ps1 -Installer $env:INSTALLER_PATH -ExerciseEvidenceLoop
+          $smoke.Stop()
+          "SMOKE_SECONDS=$([Math]::Round($smoke.Elapsed.TotalSeconds, 3))" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Record observation
+        shell: pwsh
+        run: |
+          @"
+          ## Witness v1.1.0 public release observation
+
+          - Asset bytes: $env:ASSET_BYTES
+          - SHA-256: `$env:ASSET_SHA256`
+          - Download + checksum asset fetch: $env:DOWNLOAD_SECONDS s
+          - Installed evidence loop + desktop launch + bundled-engine RPC + normal close + uninstall: $env:SMOKE_SECONDS s
+          - Result: PASS
+          "@ | Add-Content $env:GITHUB_STEP_SUMMARY
