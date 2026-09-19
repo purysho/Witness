@@ -6,6 +6,10 @@ Witness is not a chat wrapper over a vector database. It is a local-first retrie
 
 The project is designed to make the hidden parts of retrieval-augmented generation visible. Every answer should be traceable from sentence -> evidence span -> source version -> retrieval path -> ranking decision.
 
+<p align="center">
+  <img src="docs/evidence-flow.svg" width="100%" alt="Witness evidence flow — sources through retrieval, evidence reconciliation, sufficiency, answer, citations and trace" />
+</p>
+
 ## Download
 
 **Witness v1.1.0 is released for Windows x64.**
