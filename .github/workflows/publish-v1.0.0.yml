@@ -1,0 +1,44 @@
+name: Publish Witness v1.0.0
+
+on:
+  push:
+    branches:
+      - 'publish-v1.0.0-artifact'
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download validated Windows release artifact
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh run download 35421807702             --repo purysho/Witness             --name witness-windows-release-publish-v1.0.0             --dir release-assets
+
+      - name: Verify installer checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          installer="$(find release-assets -type f -name 'Witness_1.0.0_x64-setup.exe' -print -quit)"
+          checksum="$(find release-assets -type f -name 'SHA256SUMS.txt' -print -quit)"
+          test -n "$installer"
+          test -n "$checksum"
+          expected="$(awk 'NR==1 {print $1}' "$checksum")"
+          actual="$(sha256sum "$installer" | awk '{print $1}')"
+          test "$expected" = "$actual"
+          echo "Verified $installer"
+          echo "SHA256 $actual"
+
+      - name: Publish Witness v1.0.0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          installer="$(find release-assets -type f -name 'Witness_1.0.0_x64-setup.exe' -print -quit)"
+          checksum="$(find release-assets -type f -name 'SHA256SUMS.txt' -print -quit)"
+          gh release create v1.0.0             "$installer"             "$checksum"             --repo purysho/Witness             --target 00a9d75b7290034f03577909aeaf29081a6db428             --title "Witness v1.0.0"             --generate-notes
