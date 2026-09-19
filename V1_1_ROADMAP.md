@@ -185,6 +185,14 @@ Exit gate:
 - reopen/repair behavior remains deterministic;
 - baseline performance measurements are captured for future regression checks.
 
+**Status:** first robustness chunk implemented. A reproducible mixed-format stress
+harness now generates Markdown/text/HTML/CSV/source/DOCX/PPTX/XLSX/searchable
+PDF corpora, records import/reopen/query/repair/memory measurements, validates
+derived-index repair and cancellation rollback, and has passed the 18-file smoke
+on both Ubuntu and Windows engine suites. A manual Windows Stress Benchmark
+workflow captures full-run JSON artifacts. Slice 4 remains open until at least
+one representative large (default 2,000-file) baseline is executed and reviewed.
+
 ---
 
 ## Slice 5 — Lab-driven search and evidence quality
