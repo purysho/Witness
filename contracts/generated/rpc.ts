@@ -11,10 +11,11 @@ export interface WorkspaceHealthReport { status:"healthy"|"repairable"|"attentio
 export interface WorkspaceRepairResult { before:WorkspaceHealthReport; after:WorkspaceHealthReport; actions:string[]; protected_state_unchanged:boolean; }
 export interface WorkspaceBackupResult { path:string; format:"witness-workspace-backup"; format_version:1; database_sha256:string; database_bytes:number; protected_state_fingerprint:string; secrets_persisted:false; }
 export interface WorkspaceRestoreResult extends WorkspaceBackupResult { database:string; }
-export interface ProviderSettings { embedding_dimensions:number; visual_mode:"off"|"hash"; visual_dimensions:number; updated_at:string; }
+export interface ProviderSettings { embedding_mode:"hash"|"sentence-transformers"; embedding_model:string; embedding_dimensions:number; visual_mode:"off"|"hash"; visual_dimensions:number; updated_at:string; }
 export interface ProviderSnapshot {
   settings:ProviderSettings;
-  embedding:{kind:string;provider_id:string;dimensions:number;config_source:string;reindex_required:boolean};
+  embedding:{kind:string;provider_id:string;dimensions:number|null;config_source:string;reindex_required:boolean;available:boolean;availability_error:string|null;workspace_mode:"hash"|"sentence-transformers";workspace_model:string;local_files_only:boolean};
+  semantic:{mode:"sentence-transformers";model:string;dependency_available:boolean;local_files_only:true};
   reranker:{kind:string;provider_id:string;config_source:string;editable:boolean};
   generator:{kind:string;provider_id:string;config_source:string;editable:boolean};
   visual:{kind:string;provider_id:string|null;dimensions:number|null;config_source:string;workspace_mode:"off"|"hash";workspace_dimensions:number;reindex_required:boolean};
@@ -25,7 +26,7 @@ export interface DemoLoadResult { source_versions:Record<string,string>; dataset
 export interface SourceVersionSummary { source_version_id:string; logical_source_id:string; source_path:string; title:string; media_type:string; valid_from:string; valid_to:string|null; supersedes_source_version_id:string|null; superseded_by_source_version_id:string|null; archived_at:string|null; archived:boolean; }
 export interface SourceVersionChainItem { source_version_id:string; valid_from:string; valid_to:string|null; supersedes_source_version_id:string|null; superseded_by_source_version_id:string|null; archived_at:string|null; archived:boolean; }
 export interface SourceVersionDetail extends SourceVersionSummary { observed_at:string; chunk_count:number; version_chain:SourceVersionChainItem[]; }
-export interface ContextEvidence { evidence_id:string; chunk_id:string; text:string; source_version_id:string; locator:string|null; method:string; rank:number; evidence_kind:string; visual_evidence_id:string; modality:string; }
+export interface ContextEvidence { evidence_id:string; chunk_id:string; text:string; source_version_id:string; locator:string|null; method:string; rank:number; evidence_kind:string; visual_evidence_id:string; modality:string; covered_locators:string[]; }
 export interface Citation { evidence_id:string; chunk_id:string; source_version_id:string; locator:string|null; evidence_kind:string; visual_evidence_id:string; modality:string; }
 export interface AnswerSentence { text:string; evidence_ids:string[]; }
 export interface TraceEvent { event_id:string; run_id:string; sequence:number; schema_version:number; stage:string; payload:Record<string,unknown>; created_at:string; }

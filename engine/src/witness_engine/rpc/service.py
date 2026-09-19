@@ -186,18 +186,39 @@ class RpcService:
     def _apply_provider_settings(
         self,
         settings: ProviderSettings,
+        *,
+        embedding_provider=None,
     ) -> None:
         self.provider_settings = settings
-        self.embedding_provider = build_embedding_provider(settings)
+        self.embedding_provider = (
+            embedding_provider
+            if embedding_provider is not None
+            else build_embedding_provider(settings)
+        )
         self.visual_embedding_provider = (
             self.environment_visual_provider
             or build_workspace_visual_provider(settings)
         )
 
+    def _ensure_embedding_provider_available(
+        self,
+        provider=None,
+    ) -> int:
+        active = provider or self.embedding_provider
+        try:
+            return int(active.dimensions)
+        except Exception as exc:
+            raise RpcServiceError(
+                "provider_unavailable",
+                str(exc),
+                details={"provider_id": active.provider_id},
+            ) from exc
+
     def _provider_snapshot(self) -> dict[str, Any]:
         lexical, vectors = self._require_workspace()
         settings = self._provider_store().load()
-        self._apply_provider_settings(settings)
+        if settings != self.provider_settings:
+            self._apply_provider_settings(settings)
         dense_reindex_required = (
             vectors.count(self.embedding_provider.provider_id)
             < lexical.count()
@@ -230,33 +251,53 @@ class RpcService:
         self,
         params: dict[str, Any],
     ) -> dict[str, Any]:
+        current = self._provider_store().load()
         try:
-            settings = self._provider_store().save(
+            proposed = ProviderSettings(
+                embedding_mode=str(
+                    params.get("embedding_mode", current.embedding_mode)
+                ).strip().casefold(),
+                embedding_model=str(
+                    params.get("embedding_model", current.embedding_model)
+                ).strip(),
                 embedding_dimensions=int(
                     params.get(
                         "embedding_dimensions",
-                        self.provider_settings.embedding_dimensions,
+                        current.embedding_dimensions,
                     )
                 ),
                 visual_mode=str(
-                    params.get(
-                        "visual_mode",
-                        self.provider_settings.visual_mode,
-                    )
-                ),
+                    params.get("visual_mode", current.visual_mode)
+                ).strip().casefold(),
                 visual_dimensions=int(
                     params.get(
                         "visual_dimensions",
-                        self.provider_settings.visual_dimensions,
+                        current.visual_dimensions,
                     )
                 ),
+                updated_at=current.updated_at,
+            ).validate()
+            candidate = build_embedding_provider(proposed)
+            if proposed.embedding_mode == "sentence-transformers":
+                self._ensure_embedding_provider_available(candidate)
+            settings = self._provider_store().save(
+                embedding_mode=proposed.embedding_mode,
+                embedding_model=proposed.embedding_model,
+                embedding_dimensions=proposed.embedding_dimensions,
+                visual_mode=proposed.visual_mode,
+                visual_dimensions=proposed.visual_dimensions,
             )
+        except RpcServiceError:
+            raise
         except (TypeError, ValueError) as exc:
             raise RpcServiceError(
                 "invalid_provider_config",
                 str(exc),
             ) from exc
-        self._apply_provider_settings(settings)
+        self._apply_provider_settings(
+            settings,
+            embedding_provider=candidate,
+        )
         return self._provider_snapshot()
 
     def _lab_store(self) -> EvalStore:
@@ -323,6 +364,7 @@ class RpcService:
 
     def _workspace_repair(self) -> dict[str, Any]:
         lexical, vectors = self._require_workspace()
+        self._ensure_embedding_provider_available()
         return repair_workspace(
             lexical,
             vectors,
@@ -424,6 +466,7 @@ class RpcService:
 
     def _demo_load(self) -> dict[str, Any]:
         lexical, vectors = self._require_workspace()
+        self._ensure_embedding_provider_available()
         assert self.workspace_path is not None
         assert self.visual_index is not None
         return install_demo_pack(
@@ -545,6 +588,7 @@ class RpcService:
                 "source_not_found",
                 f"Source file does not exist: {source_path}",
             )
+        self._ensure_embedding_provider_available()
         valid_from_raw = params.get("valid_from")
         valid_from: str | datetime | None = (
             str(valid_from_raw).strip()
@@ -609,6 +653,7 @@ class RpcService:
                 "invalid_params",
                 "query.run requires a non-empty question",
             )
+        self._ensure_embedding_provider_available()
         limit = min(
             max(int(params.get("limit", 10)), 1),
             50,
@@ -708,6 +753,7 @@ class RpcService:
                 "invalid_params",
                 "lab.run requires dataset_fingerprint",
             )
+        self._ensure_embedding_provider_available()
         probe, task_store, job_id = self._begin_task(
             params,
             "lab.run",
@@ -867,6 +913,7 @@ class RpcService:
                 "invalid_params",
                 "attack.run requires manifest_fingerprint and dataset_fingerprint",
             )
+        self._ensure_embedding_provider_available()
         probe, task_store, job_id = self._begin_task(
             params,
             "attack.run",
