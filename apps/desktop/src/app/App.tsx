@@ -62,7 +62,8 @@ function isCancellation(reason: unknown): boolean {
 
 export function App() {
   const [tab, setTab] = useState<Tab>("ask");
-  const [workspacePath, setWorkspacePath] = useState(rememberedWorkspace);
+  const [rememberedAtLaunch] = useState(() => rememberedWorkspace());
+  const [workspacePath, setWorkspacePath] = useState(rememberedAtLaunch);
   const [workspace, setWorkspace] = useState<WorkspaceOpenResult | null>(null);
   const [workspaceHealth, setWorkspaceHealth] =
     useState<WorkspaceHealthReport | null>(null);
@@ -221,6 +222,13 @@ export function App() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function scrollToLibrary() {
+    document.getElementById("library")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
   }
 
   async function browseSource() {
@@ -747,14 +755,14 @@ export function App() {
               disabled={busy}
               onClick={browseWorkspace}
             >
-              Browse
+              Choose folder
             </button>
             <button
               className="secondary"
               disabled={busy || !workspacePath.trim()}
               onClick={openWorkspace}
             >
-              {workspace ? "Reopen" : "Open workspace"}
+              {workspace ? "Reopen" : "Open / create path"}
             </button>
           </div>
           {activeJob && (
@@ -790,29 +798,39 @@ export function App() {
               <span className="eyebrow">FIRST RUN</span>
               <h2>Start with a local evidence workspace</h2>
               <p>
-                Choose a folder for Witness. Your source versions, indexes,
-                traces, Lab runs, and attack artifacts stay inside that local
-                workspace.
+                Choose an existing folder, or type a new folder path in the
+                Workspace field above and select Open / create path. Witness
+                creates a missing folder and keeps all evidence data local.
               </p>
+              <small className="first-run-note">
+                No account, cloud sync, Python install, or server setup is required.
+              </small>
             </div>
             <ol className="first-run-steps">
-              <li><strong>01</strong><span>Choose or create a workspace folder.</span></li>
-              <li><strong>02</strong><span>Add a local evidence file from Library.</span></li>
+              <li><strong>01</strong><span>Open or create a local workspace.</span></li>
+              <li><strong>02</strong><span>Try the demo or import your own evidence.</span></li>
               <li><strong>03</strong><span>Ask a question, then inspect its Trace.</span></li>
             </ol>
             <div className="first-run-actions">
-              <button className="primary" disabled={busy} onClick={browseWorkspace}>
-                Choose workspace
-              </button>
               {workspacePath.trim() && (
                 <button
-                  className="secondary"
+                  className="primary"
                   disabled={busy}
                   onClick={openWorkspace}
                 >
-                  Open remembered workspace
+                  {rememberedAtLaunch &&
+                  workspacePath.trim() === rememberedAtLaunch
+                    ? "Continue last workspace"
+                    : "Open / create entered path"}
                 </button>
               )}
+              <button
+                className={workspacePath.trim() ? "secondary" : "primary"}
+                disabled={busy}
+                onClick={browseWorkspace}
+              >
+                {workspacePath.trim() ? "Choose another folder" : "Choose folder"}
+              </button>
             </div>
           </section>
         )}
@@ -856,21 +874,30 @@ export function App() {
         {workspace && sources.length === 0 && (
           <section className="demo-onboarding">
             <div>
-              <span className="eyebrow">FIRST-RUN DEMO</span>
-              <strong>See the complete evidence loop with one local demo pack.</strong>
+              <span className="eyebrow">EMPTY WORKSPACE</span>
+              <strong>Try Witness with the demo, or start with your own evidence.</strong>
               <small>
-                Installs versioned API evidence, authentication evidence, a Lab
-                benchmark, and a prompt-injection Attack fixture. Witness then
-                asks the temporal demo question and opens its real Trace.
+                The demo installs a small local versioned evidence pack, runs a
+                real question, and opens its Trace. Nothing is downloaded from a
+                model provider.
               </small>
             </div>
-            <button
-              className="primary"
-              disabled={busy}
-              onClick={loadFirstRunDemo}
-            >
-              Load demo & open Trace
-            </button>
+            <div className="demo-onboarding-actions">
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={loadFirstRunDemo}
+              >
+                Try demo & open Trace
+              </button>
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={scrollToLibrary}
+              >
+                Import my own files
+              </button>
+            </div>
           </section>
         )}
 

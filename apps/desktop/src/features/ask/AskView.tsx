@@ -16,7 +16,10 @@ export function AskView({question,result,busy,workspaceReady,onQuestion,onAsk,on
           {result && <StateBadge state={result.answer.state}/>}
         </div>
         <textarea className="question-box" value={question} onChange={e=>onQuestion(e.target.value)}
-          placeholder="Ask a question that the indexed evidence can support…" rows={4}/>
+          disabled={!workspaceReady}
+          placeholder={workspaceReady
+            ? "Ask a question that the indexed evidence can support…"
+            : "Open a workspace before asking a question."} rows={4}/>
         <div className="ask-actions">
           <button className="primary" disabled={busy||!workspaceReady||!question.trim()} onClick={onAsk}>
             {busy ? "Running evidence pipeline…" : "Run Ask"}
@@ -43,7 +46,9 @@ export function AskView({question,result,busy,workspaceReady,onQuestion,onAsk,on
             ))}
             <div className="reason-list">{result.sufficiency.reasons.map(reason=><span key={reason}>{reason}</span>)}</div>
           </div>
-        ) : <div className="empty answer-empty">Answers appear here only after Witness has retrieved, reconciled, and checked the evidence.</div>}
+        ) : <div className="empty answer-empty">{workspaceReady
+          ? "Answers appear here only after Witness has retrieved, reconciled, and checked the evidence."
+          : "Open or create a workspace first. Then import evidence or try the local demo."}</div>}
       </section>
       <section className="panel evidence-panel">
         <div className="panel-heading">
@@ -71,7 +76,9 @@ export function AskView({question,result,busy,workspaceReady,onQuestion,onAsk,on
                 <span>{item.method}</span>
               </footer>
             </article>
-          )) : <div className="empty">Run a question to inspect selected evidence.</div>}
+          )) : <div className="empty">{workspaceReady
+            ? "Run a question to inspect selected evidence."
+            : "Selected evidence appears after a workspace is open and a question has run."}</div>}
         </div>
       </section>
     </div>

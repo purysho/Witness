@@ -64,7 +64,7 @@ export function LibraryPanel({
   }
 
   return (
-    <section className="panel library-panel">
+    <section className="panel library-panel" id="library">
       <div className="panel-heading">
         <div>
           <span className="eyebrow">LIBRARY</span>
