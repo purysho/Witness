@@ -51,6 +51,15 @@ Use V1.2 for intentional capability expansion or broader redesign, including:
 
 The post-release observation workflow downloads these exact public assets from GitHub Releases, independently rehashes the installer, and runs the existing installed-package smoke against those downloaded bytes.
 
+First public-artifact observation, run `35449322964`, passed on GitHub's Windows Server 2025 hosted runner:
+
+- installer and checksum asset fetch: 1.938 s;
+- downloaded size: 31,615,762 bytes;
+- downloaded SHA-256 matched the published checksum and recorded release hash;
+- install -> desktop launch -> bundled-engine RPC -> normal close -> uninstall: 12.628 s.
+
+These hosted-runner/network timings are observation data, not fixed performance thresholds.
+
 ### Large corpus
 
 V1.1 stress baseline, run `35431097813`:
@@ -90,13 +99,13 @@ V1.1 quality baseline, run `35439951846`:
 | --- | --- | --- | --- |
 | 2026-09-19 | Repository issue queue | No open GitHub issues were present at observation start. | No patch candidate |
 | 2026-09-19 | Main CI | Full six-job post-release cleanup CI was green. | No patch candidate |
-| 2026-09-19 | Public release artifact | Exact public-download install/launch/RPC/uninstall observation added in this triage branch. | Pending workflow result |
+| 2026-09-19 | Public release artifact | Run `35449322964` independently downloaded the exact public installer/checksum, verified 31,615,762 bytes and SHA-256 `d092c31b...`, then passed install/launch/bundled-engine RPC/normal-close/uninstall in 12.628 s. | No patch candidate |
 | 2026-09-19 | Derived-index repair | ~33.6 s at the 2,000-file V1.1 baseline. Correctness remained healthy. | Watch only; no regression established |
 | 2026-09-19 | Unsigned installer | Known and disclosed V1.1 distribution limitation; no signing identity is provisioned. | Operational/V1.2 dependency, not V1.1.1 |
 
 ## V1.1.1 candidate register
 
-No item qualifies at observation start.
+No item qualifies at observation start or after the first public-artifact smoke.
 
 Add an item only after a reproducible defect/regression is recorded. For each candidate capture:
 
