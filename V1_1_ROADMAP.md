@@ -294,6 +294,14 @@ Exit gate:
 - release artifacts carry correct metadata and verification information;
 - update behavior is explicit and does not silently weaken workspace safety.
 
+**Status:** complete on the V1.1 release-candidate branch. Release-facing
+versions are synchronized and tag-validated, Windows NSIS product/publisher/
+identifier/icon metadata is checked in CI, the changelog and v1.1 release notes
+are maintained in-repo, signing/SmartScreen policy is documented, and V1.1
+performs no automatic update checks or background update networking. Code
+signing remains intentionally pending a trusted signing identity rather than
+embedding credentials or bypassing Windows reputation controls.
+
 ---
 
 ## Deferred breadth
@@ -319,7 +327,7 @@ V1.1 is complete only when:
    - desktop web build;
    - Windows Rust/Tauri host check;
    - frozen sidecar + NSIS installed-app smoke;
-7. version metadata is bumped only during final release preparation.
+7. version metadata is bumped to 1.1.0 during final release preparation.
 
 ## Out of scope for V1.1
 
