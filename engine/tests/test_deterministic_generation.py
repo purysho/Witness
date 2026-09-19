@@ -110,3 +110,36 @@ def test_historical_exact_lookup_keeps_best_ranked_version_when_relevance_ties()
         "The public API listens on port 4100."
     ]
     assert generated.sentences[0].evidence_ids == ("historical",)
+
+
+def test_broad_summary_uses_multiple_sentences_from_top_structural_context():
+    provider = DeterministicExtractiveGenerationProvider()
+    context = _context(
+        "Summarize the authentication recovery process.",
+        (
+            _evidence(
+                "recovery",
+                "# Authentication\n\n"
+                "## Recovery\n\n"
+                "Expired sessions require a fresh login.\n\n"
+                "Recovery requires the user to authenticate again before a new token is issued.",
+                1,
+            ),
+            _evidence(
+                "distractor",
+                "Authentication uses bearer access tokens.",
+                2,
+            ),
+        ),
+    )
+
+    generated = provider.generate(context)
+
+    assert [item.text for item in generated.sentences] == [
+        "Expired sessions require a fresh login.",
+        "Recovery requires the user to authenticate again before a new token is issued.",
+    ]
+    assert all(
+        item.evidence_ids == ("recovery",)
+        for item in generated.sentences
+    )
