@@ -1,7 +1,4 @@
-# Witness v1.1.0 — Draft release notes
-
-> **Draft:** v1.1.0 is not released yet. These notes become release notes only
-> after the final compatibility/release gate, metadata bump to 1.1.0, and tag.
+# Witness v1.1.0
 
 Witness v1.1 is a post-release hardening release. It keeps the V1 local-first,
 evidence-first architecture while improving everyday source management,
