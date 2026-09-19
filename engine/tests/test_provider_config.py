@@ -1,3 +1,4 @@
+import sqlite3
 from __future__ import annotations
 
 import pytest
@@ -277,3 +278,141 @@ def test_semantic_provider_uses_distinct_projection_and_repair(
         assert answer["retrieval"]["trace"]["embedding_provider_id"] == semantic_id
     finally:
         service.close()
+
+
+def test_legacy_v1_provider_settings_table_migrates_without_losing_values(tmp_path):
+    workspace = tmp_path / "LegacyProviders.witness"
+    workspace.mkdir()
+    database = workspace / "witness.db"
+
+    connection = sqlite3.connect(database)
+    try:
+        connection.execute(
+            """
+            CREATE TABLE workspace_provider_settings (
+                singleton_id INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+                embedding_dimensions INTEGER NOT NULL,
+                visual_mode TEXT NOT NULL,
+                visual_dimensions INTEGER NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO workspace_provider_settings (
+                singleton_id, embedding_dimensions, visual_mode,
+                visual_dimensions, updated_at
+            ) VALUES (1, 128, 'hash', 32, '2026-09-01T00:00:00+00:00')
+            """
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    # Opening the workspace creates the remaining Witness tables and migrates
+    # provider columns in place.
+    service = RpcService()
+    try:
+        service.handle("workspace.open", {"path": str(workspace)})
+        settings = service.handle("providers.get", {})["settings"]
+        assert settings["embedding_mode"] == "hash"
+        assert settings["embedding_model"] == provider_config.DEFAULT_SEMANTIC_MODEL
+        assert settings["embedding_dimensions"] == 128
+        assert settings["visual_mode"] == "hash"
+        assert settings["visual_dimensions"] == 32
+
+        assert service.lexical is not None
+        columns = {
+            row["name"]
+            for row in service.lexical.connection.execute(
+                "PRAGMA table_info(workspace_provider_settings)"
+            ).fetchall()
+        }
+        assert "embedding_mode" in columns
+        assert "embedding_model" in columns
+    finally:
+        service.close()
+
+
+def test_missing_saved_semantic_provider_still_allows_health_and_backup(
+    tmp_path,
+    monkeypatch,
+):
+    class FakeSemantic:
+        def __init__(self, model_name, *, local_files_only=True, device=None):
+            self.model_name = model_name
+
+        @property
+        def provider_id(self):
+            return f"sentence-transformers:{self.model_name}"
+
+        @property
+        def dimensions(self):
+            return 3
+
+        def embed(self, texts):
+            return [(1.0, 0.0, 0.0) for _ in texts]
+
+    monkeypatch.setattr(
+        provider_config,
+        "SentenceTransformerEmbeddingProvider",
+        FakeSemantic,
+    )
+
+    workspace = tmp_path / "SavedSemantic.witness"
+    source = tmp_path / "evidence.md"
+    source.write_text("# Evidence\n\nThe API port is 5200.\n", encoding="utf-8")
+
+    service = RpcService()
+    try:
+        service.handle("workspace.open", {"path": str(workspace)})
+        service.handle("source.import", {"path": str(source)})
+        service.handle(
+            "providers.set",
+            {
+                "embedding_mode": "sentence-transformers",
+                "embedding_model": provider_config.DEFAULT_SEMANTIC_MODEL,
+            },
+        )
+        service.handle("workspace.repair", {})
+    finally:
+        service.close()
+
+    class MissingSemantic(FakeSemantic):
+        @property
+        def dimensions(self):
+            raise RuntimeError("semantic model vanished")
+
+    monkeypatch.setattr(
+        provider_config,
+        "SentenceTransformerEmbeddingProvider",
+        MissingSemantic,
+    )
+
+    reopened = RpcService()
+    backup = tmp_path / "saved-semantic.witness-backup"
+    try:
+        opened = reopened.handle("workspace.open", {"path": str(workspace)})
+        assert opened["source_versions"] == 1
+
+        health = reopened.handle("workspace.health", {})
+        assert health["status"] == "healthy"
+
+        snapshot = reopened.handle("providers.get", {})
+        assert snapshot["settings"]["embedding_mode"] == "sentence-transformers"
+        assert snapshot["embedding"]["available"] is False
+        assert "semantic model vanished" in snapshot["embedding"]["availability_error"]
+
+        result = reopened.handle("workspace.backup", {"path": str(backup)})
+        assert result["secrets_persisted"] is False
+        assert backup.is_file()
+
+        with pytest.raises(RpcServiceError) as exc:
+            reopened.handle(
+                "query.run",
+                {"question": "What is the API port?"},
+            )
+        assert exc.value.code == "provider_unavailable"
+    finally:
+        reopened.close()
