@@ -13,6 +13,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Download and verify published v1.1.0 assets
         shell: pwsh
@@ -56,12 +59,12 @@ jobs:
           "ASSET_BYTES=$actualBytes" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "ASSET_SHA256=$actualHash" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
-      - name: Smoke exact published Windows installer
+      - name: Exercise exact published Windows package
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
           $smoke = [Diagnostics.Stopwatch]::StartNew()
-          ./tools/smoke-installed.ps1 -Installer $env:INSTALLER_PATH
+          ./tools/smoke-installed.ps1 -Installer $env:INSTALLER_PATH -ExerciseEvidenceLoop
           $smoke.Stop()
           "SMOKE_SECONDS=$([Math]::Round($smoke.Elapsed.TotalSeconds, 3))" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
@@ -74,6 +77,6 @@ jobs:
           - Asset bytes: $env:ASSET_BYTES
           - SHA-256: `$env:ASSET_SHA256`
           - Download + checksum asset fetch: $env:DOWNLOAD_SECONDS s
-          - Install + launch + bundled-engine RPC + normal close + uninstall smoke: $env:SMOKE_SECONDS s
+          - Installed evidence loop + desktop launch + bundled-engine RPC + normal close + uninstall: $env:SMOKE_SECONDS s
           - Result: PASS
           "@ | Add-Content $env:GITHUB_STEP_SUMMARY
