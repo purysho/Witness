@@ -146,6 +146,7 @@ def rerank_candidates(
                 evidence_kind=candidate.evidence_kind,
                 visual_evidence_id=candidate.visual_evidence_id,
                 modality=candidate.modality,
+                covered_locators=candidate.covered_locators,
             )
         )
         traces.append(

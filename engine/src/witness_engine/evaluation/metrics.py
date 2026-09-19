@@ -19,6 +19,7 @@ class CandidateMeta:
     source_version_id: str
     locator: str
     source_path: str
+    covered_locators: tuple[str, ...] = ()
 
 
 def _norm_path(value: str) -> str:
@@ -35,7 +36,11 @@ def evidence_matches(ref: GoldEvidenceRef, candidate: CandidateMeta) -> bool:
         return False
     if ref.source_version_id and ref.source_version_id != candidate.source_version_id:
         return False
-    if ref.locator and ref.locator != candidate.locator:
+    if (
+        ref.locator
+        and ref.locator != candidate.locator
+        and ref.locator not in candidate.covered_locators
+    ):
         return False
     if ref.source_path:
         wanted = _norm_path(ref.source_path)
@@ -118,6 +123,7 @@ def score_case(
             source_version_id=item.source_version_id,
             locator=item.locator,
             source_path=source_paths.get(item.source_version_id, ""),
+            covered_locators=item.covered_locators,
         )
         for item in ask_result.retrieval.candidates
     ]
@@ -145,6 +151,7 @@ def score_case(
             source_version_id=item.source_version_id,
             locator=item.locator or "",
             source_path=source_paths.get(item.source_version_id, ""),
+            covered_locators=item.covered_locators,
         )
         for item in ask_result.context.evidence
     }

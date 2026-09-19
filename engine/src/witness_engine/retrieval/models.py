@@ -22,3 +22,4 @@ class RetrievalCandidate:
     evidence_kind: str = "text"
     visual_evidence_id: str = ""
     modality: str = ""
+    covered_locators: tuple[str, ...] = ()

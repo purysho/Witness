@@ -99,6 +99,7 @@ def reciprocal_rank_fusion(
                 evidence_kind=representative.evidence_kind,
                 visual_evidence_id=representative.visual_evidence_id,
                 modality=representative.modality,
+                covered_locators=representative.covered_locators,
             )
         )
         trace_items.append(
