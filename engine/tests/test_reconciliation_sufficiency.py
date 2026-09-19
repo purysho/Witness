@@ -6,6 +6,7 @@ from witness_engine.evidence import (
     SufficiencyGate,
     SufficiencyState,
 )
+from witness_engine.evidence.reconcile import ReconciliationResult
 from witness_engine.pipeline import index_document
 from witness_engine.retrieval import (
     DeterministicHashEmbeddingProvider,
@@ -13,6 +14,7 @@ from witness_engine.retrieval import (
     LocalVectorIndex,
     RoutedRetriever,
 )
+from witness_engine.retrieval.models import RetrievalCandidate
 
 
 def _retrieve(database, documents, question, *, limit=10):
@@ -124,17 +126,28 @@ def test_unrelated_evidence_is_insufficient(tmp_path):
     assert sufficiency.query_coverage < 0.25
 
 
-def test_exactly_quarter_query_coverage_is_insufficient(tmp_path):
-    document = tmp_path / "metadata.md"
-    document.write_text(
-        "# Metadata\n\nRequest metadata is required.\n",
-        encoding="utf-8",
+def test_exactly_quarter_query_coverage_is_insufficient():
+    candidate = RetrievalCandidate(
+        chunk_id="quarter-coverage",
+        text="Required.",
+        score=1.0,
+        rank=1,
+        method="fixture",
+    )
+    reconciliation = ReconciliationResult(
+        observations=(),
+        relations=(),
+        unresolved_conflicts=(),
+        supersessions=(),
+        duplicates=(),
+        corroborations=(),
+        independent_source_count=1,
     )
 
-    _retrieval, _reconciliation, sufficiency = _retrieve(
-        tmp_path / "witness-quarter.sqlite3",
-        ((document, "2026-01-01T00:00:00+00:00"),),
+    sufficiency = SufficiencyGate().decide(
         "What database encryption algorithm is required?",
+        (candidate,),
+        reconciliation,
     )
 
     assert sufficiency.query_coverage == 0.25
