@@ -1,0 +1,88 @@
+name: Bug report
+description: Report a reproducible problem in a released Witness build.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please report released-build behavior, not feature requests. Do not upload private evidence documents, API keys, or workspace secrets.
+
+  - type: dropdown
+    id: version
+    attributes:
+      label: Witness version
+      options:
+        - v1.1.0
+        - v1.0.0
+        - Other / development build
+    validations:
+      required: true
+
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: e.g. Windows 11 24H2
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_source
+    attributes:
+      label: Installation source
+      options:
+        - Official GitHub Release installer
+        - Built from source
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Give the smallest sequence that reproduces the problem.
+      placeholder: |
+        1. Install...
+        2. Create/open...
+        3. Import/ask...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+    validations:
+      required: true
+
+  - type: input
+    id: trace
+    attributes:
+      label: Trace or QueryRun identifier
+      description: Optional. Include identifiers only; do not paste private source text.
+
+  - type: textarea
+    id: health
+    attributes:
+      label: Workspace health / recovery information
+      description: Optional. Summarize health status or recovery errors without private evidence content.
+
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency
+      options:
+        - Every time
+        - Often
+        - Intermittent
+        - Once
+    validations:
+      required: true
