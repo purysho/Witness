@@ -263,6 +263,18 @@ Exit gate:
 - unavailable providers fail clearly and leave the workspace healthy;
 - deterministic mode remains fully usable.
 
+**Status:** complete and verified on the V1.1 branch. Workspace provider settings
+now support the deterministic hash baseline or the optional local-only
+`sentence-transformers/all-MiniLM-L6-v2` projection. Semantic selection is
+validated before persistence, unavailable dependencies/models fail with
+`provider_unavailable`, old settings remain unchanged on failure, and provider
+IDs keep hash/semantic vectors in distinct projections. Existing V1 provider
+tables migrate in place. A saved semantic workspace can still open, inspect
+health, and create a backup if the optional model later disappears, while
+embedding-dependent operations fail closed. The desktop exposes provider mode,
+availability, model identity, and reindex state. The implementation passed the
+full six-job CI matrix at `b2cecb71`.
+
 ---
 
 ## Slice 7 — Distribution polish
