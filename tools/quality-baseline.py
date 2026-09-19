@@ -14,9 +14,9 @@ from witness_engine.evaluation import (
     EvalStore,
     RetrievalMode,
     compare_runs,
-    corpus_fingerprint,
     load_dataset_file,
 )
+from witness_engine.evaluation.runner import corpus_fingerprint
 from witness_engine.pipeline import index_document
 from witness_engine.rpc.service import RpcService
 
