@@ -123,7 +123,7 @@ class SufficiencyGate:
             reasons.append(
                 f"{len(reconciliation.unresolved_conflicts)} unresolved material contradiction(s) remain"
             )
-        elif coverage < 0.25:
+        elif coverage <= 0.25:
             state = SufficiencyState.INSUFFICIENT
             reasons.append(
                 f"retrieved evidence covers only {coverage:.0%} of meaningful query terms"

@@ -77,9 +77,11 @@ class SentenceTransformerEmbeddingProvider:
         model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
         *,
         device: str | None = None,
+        local_files_only: bool = True,
     ) -> None:
         self.model_name = model_name
         self.device = device
+        self.local_files_only = local_files_only
         self._model = None
         self._dimensions: int | None = None
 
@@ -95,7 +97,19 @@ class SentenceTransformerEmbeddingProvider:
                 raise RuntimeError(
                     "Install witness-engine[embeddings] to use local semantic embeddings"
                 ) from exc
-            self._model = SentenceTransformer(self.model_name, device=self.device)
+            try:
+                self._model = SentenceTransformer(
+                    self.model_name,
+                    device=self.device,
+                    local_files_only=self.local_files_only,
+                )
+            except Exception as exc:
+                mode = "local cache" if self.local_files_only else "configured source"
+                raise RuntimeError(
+                    f"Semantic embedding model '{self.model_name}' is unavailable "
+                    f"from the {mode}. Install witness-engine[embeddings] and "
+                    "cache the model locally before selecting it."
+                ) from exc
             self._dimensions = int(self._model.get_sentence_embedding_dimension())
         return self._model
 

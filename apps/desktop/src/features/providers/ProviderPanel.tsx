@@ -5,6 +5,8 @@ interface Props {
   snapshot: ProviderSnapshot;
   busy: boolean;
   onApply: (
+    embeddingMode: "hash" | "sentence-transformers",
+    embeddingModel: string,
     embeddingDimensions: number,
     visualMode: "off" | "hash",
     visualDimensions: number,
@@ -18,6 +20,12 @@ export function ProviderPanel({
   busy,
   onApply,
 }: Props) {
+  const [embeddingMode, setEmbeddingMode] = useState<
+    "hash" | "sentence-transformers"
+  >(snapshot.settings.embedding_mode);
+  const [embeddingModel, setEmbeddingModel] = useState(
+    snapshot.settings.embedding_model,
+  );
   const [embeddingDimensions, setEmbeddingDimensions] = useState(
     snapshot.settings.embedding_dimensions,
   );
@@ -29,6 +37,8 @@ export function ProviderPanel({
   );
 
   useEffect(() => {
+    setEmbeddingMode(snapshot.settings.embedding_mode);
+    setEmbeddingModel(snapshot.settings.embedding_model);
     setEmbeddingDimensions(snapshot.settings.embedding_dimensions);
     setVisualMode(snapshot.settings.visual_mode);
     setVisualDimensions(snapshot.settings.visual_dimensions);
@@ -55,20 +65,69 @@ export function ProviderPanel({
         <label className="field">
           <span>Text embedding</span>
           <select
-            value={embeddingDimensions}
+            value={embeddingMode}
             disabled={busy}
             onChange={(event) =>
-              setEmbeddingDimensions(Number(event.target.value))
+              setEmbeddingMode(
+                event.target.value as "hash" | "sentence-transformers",
+              )
             }
           >
-            {DIMENSIONS.map((value) => (
-              <option key={value} value={value}>
-                Deterministic hash · {value}d
-              </option>
-            ))}
+            <option value="hash">Deterministic hash</option>
+            <option
+              value="sentence-transformers"
+              disabled={!snapshot.semantic.dependency_available}
+            >
+              Semantic MiniLM · local only
+            </option>
           </select>
-          <small>{snapshot.embedding.provider_id}</small>
+          <small>
+            {embeddingMode === "sentence-transformers"
+              ? snapshot.semantic.dependency_available
+                ? "Optional semantic provider · local cached model only"
+                : "Optional dependency unavailable in this installation"
+              : "Guaranteed offline deterministic baseline"}
+          </small>
         </label>
+
+        {embeddingMode === "hash" ? (
+          <label className="field">
+            <span>Hash dimensions</span>
+            <select
+              value={embeddingDimensions}
+              disabled={busy}
+              onChange={(event) =>
+                setEmbeddingDimensions(Number(event.target.value))
+              }
+            >
+              {DIMENSIONS.map((value) => (
+                <option key={value} value={value}>
+                  {value}d
+                </option>
+              ))}
+            </select>
+            <small>{snapshot.embedding.provider_id}</small>
+          </label>
+        ) : (
+          <label className="field">
+            <span>Semantic model</span>
+            <select
+              value={embeddingModel}
+              disabled={busy || !snapshot.semantic.dependency_available}
+              onChange={(event) => setEmbeddingModel(event.target.value)}
+            >
+              <option value={snapshot.semantic.model}>
+                {snapshot.semantic.model}
+              </option>
+            </select>
+            <small>
+              {snapshot.embedding.available
+                ? snapshot.embedding.provider_id
+                : snapshot.embedding.availability_error ??
+                  "Model must already exist in the local cache."}
+            </small>
+          </label>
+        )}
 
         <label className="field">
           <span>Visual retrieval</span>
@@ -125,6 +184,8 @@ export function ProviderPanel({
           disabled={busy}
           onClick={() =>
             onApply(
+              embeddingMode,
+              embeddingModel,
               embeddingDimensions,
               visualMode,
               visualDimensions,

@@ -15,6 +15,11 @@ from pydantic import ValidationError
 
 from ..attack import AttackManifest, AttackRunner, AttackStore, export_attack_run
 from ..answering import LocalRunStore
+from ..backup import (
+    WorkspaceBackupError,
+    create_workspace_backup,
+    restore_workspace_backup,
+)
 from ..demo import install_demo_pack
 from ..evaluation import (
     EvalConfig,
@@ -62,11 +67,16 @@ ALLOWED_METHODS = frozenset(
         "workspace.open",
         "workspace.health",
         "workspace.repair",
+        "workspace.backup",
+        "workspace.restore",
         "providers.get",
         "providers.set",
         "demo.load",
         "source.import",
         "source.list",
+        "source.detail",
+        "source.archive",
+        "source.restore",
         "query.run",
         "query.trace",
         "graph.snapshot",
@@ -176,18 +186,39 @@ class RpcService:
     def _apply_provider_settings(
         self,
         settings: ProviderSettings,
+        *,
+        embedding_provider=None,
     ) -> None:
         self.provider_settings = settings
-        self.embedding_provider = build_embedding_provider(settings)
+        self.embedding_provider = (
+            embedding_provider
+            if embedding_provider is not None
+            else build_embedding_provider(settings)
+        )
         self.visual_embedding_provider = (
             self.environment_visual_provider
             or build_workspace_visual_provider(settings)
         )
 
+    def _ensure_embedding_provider_available(
+        self,
+        provider=None,
+    ) -> int:
+        active = provider or self.embedding_provider
+        try:
+            return int(active.dimensions)
+        except Exception as exc:
+            raise RpcServiceError(
+                "provider_unavailable",
+                str(exc),
+                details={"provider_id": active.provider_id},
+            ) from exc
+
     def _provider_snapshot(self) -> dict[str, Any]:
         lexical, vectors = self._require_workspace()
         settings = self._provider_store().load()
-        self._apply_provider_settings(settings)
+        if settings != self.provider_settings:
+            self._apply_provider_settings(settings)
         dense_reindex_required = (
             vectors.count(self.embedding_provider.provider_id)
             < lexical.count()
@@ -220,33 +251,53 @@ class RpcService:
         self,
         params: dict[str, Any],
     ) -> dict[str, Any]:
+        current = self._provider_store().load()
         try:
-            settings = self._provider_store().save(
+            proposed = ProviderSettings(
+                embedding_mode=str(
+                    params.get("embedding_mode", current.embedding_mode)
+                ).strip().casefold(),
+                embedding_model=str(
+                    params.get("embedding_model", current.embedding_model)
+                ).strip(),
                 embedding_dimensions=int(
                     params.get(
                         "embedding_dimensions",
-                        self.provider_settings.embedding_dimensions,
+                        current.embedding_dimensions,
                     )
                 ),
                 visual_mode=str(
-                    params.get(
-                        "visual_mode",
-                        self.provider_settings.visual_mode,
-                    )
-                ),
+                    params.get("visual_mode", current.visual_mode)
+                ).strip().casefold(),
                 visual_dimensions=int(
                     params.get(
                         "visual_dimensions",
-                        self.provider_settings.visual_dimensions,
+                        current.visual_dimensions,
                     )
                 ),
+                updated_at=current.updated_at,
+            ).validate()
+            candidate = build_embedding_provider(proposed)
+            if proposed.embedding_mode == "sentence-transformers":
+                self._ensure_embedding_provider_available(candidate)
+            settings = self._provider_store().save(
+                embedding_mode=proposed.embedding_mode,
+                embedding_model=proposed.embedding_model,
+                embedding_dimensions=proposed.embedding_dimensions,
+                visual_mode=proposed.visual_mode,
+                visual_dimensions=proposed.visual_dimensions,
             )
+        except RpcServiceError:
+            raise
         except (TypeError, ValueError) as exc:
             raise RpcServiceError(
                 "invalid_provider_config",
                 str(exc),
             ) from exc
-        self._apply_provider_settings(settings)
+        self._apply_provider_settings(
+            settings,
+            embedding_provider=candidate,
+        )
         return self._provider_snapshot()
 
     def _lab_store(self) -> EvalStore:
@@ -313,6 +364,7 @@ class RpcService:
 
     def _workspace_repair(self) -> dict[str, Any]:
         lexical, vectors = self._require_workspace()
+        self._ensure_embedding_provider_available()
         return repair_workspace(
             lexical,
             vectors,
@@ -320,6 +372,59 @@ class RpcService:
             visual_index=self.visual_index,
             visual_embedding_provider=self.visual_embedding_provider,
         ).to_dict()
+
+    def _workspace_backup(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        lexical, _ = self._require_workspace()
+        assert self.workspace_path is not None
+        raw_path = str(params.get("path", "")).strip()
+        if not raw_path:
+            raise RpcServiceError(
+                "invalid_params",
+                "workspace.backup requires path",
+            )
+        try:
+            return create_workspace_backup(
+                lexical.connection,
+                self.workspace_path,
+                raw_path,
+            )
+        except (WorkspaceBackupError, OSError) as exc:
+            raise RpcServiceError(
+                "workspace_backup_failed",
+                str(exc),
+            ) from exc
+
+    def _workspace_restore(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        backup_path = str(
+            params.get("backup_path", "")
+        ).strip()
+        destination_path = str(
+            params.get("destination_path", "")
+        ).strip()
+        if not backup_path or not destination_path:
+            raise RpcServiceError(
+                "invalid_params",
+                (
+                    "workspace.restore requires "
+                    "backup_path and destination_path"
+                ),
+            )
+        try:
+            return restore_workspace_backup(
+                backup_path,
+                destination_path,
+            )
+        except (WorkspaceBackupError, OSError) as exc:
+            raise RpcServiceError(
+                "workspace_restore_failed",
+                str(exc),
+            ) from exc
 
     def _begin_task(
         self,
@@ -361,6 +466,7 @@ class RpcService:
 
     def _demo_load(self) -> dict[str, Any]:
         lexical, vectors = self._require_workspace()
+        self._ensure_embedding_provider_available()
         assert self.workspace_path is not None
         assert self.visual_index is not None
         return install_demo_pack(
@@ -380,12 +486,90 @@ class RpcService:
                 source_version_id, logical_source_id, source_path, title,
                 media_type, valid_from, valid_to,
                 supersedes_source_version_id,
-                superseded_by_source_version_id
+                superseded_by_source_version_id, archived_at
             FROM source_version_metadata
             ORDER BY valid_from DESC, source_version_id DESC
             """
         ).fetchall()
-        return [dict(row) for row in rows]
+        return [
+            {
+                **dict(row),
+                "archived": row["archived_at"] is not None,
+            }
+            for row in rows
+        ]
+
+    @staticmethod
+    def _required_source_version_id(
+        params: dict[str, Any],
+        method: str,
+    ) -> str:
+        source_version_id = str(
+            params.get("source_version_id", "")
+        ).strip()
+        if not source_version_id:
+            raise RpcServiceError(
+                "invalid_params",
+                f"{method} requires source_version_id",
+            )
+        return source_version_id
+
+    def _source_detail(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        lexical, _ = self._require_workspace()
+        source_version_id = self._required_source_version_id(
+            params,
+            "source.detail",
+        )
+        try:
+            return LocalTemporalIndex(lexical).source_detail(
+                source_version_id
+            )
+        except KeyError as exc:
+            raise RpcServiceError(
+                "source_not_found",
+                str(exc),
+            ) from exc
+
+    def _archive_source(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        lexical, _ = self._require_workspace()
+        source_version_id = self._required_source_version_id(
+            params,
+            "source.archive",
+        )
+        temporal = LocalTemporalIndex(lexical)
+        try:
+            temporal.archive_source_version(source_version_id)
+            return temporal.source_detail(source_version_id)
+        except KeyError as exc:
+            raise RpcServiceError(
+                "source_not_found",
+                str(exc),
+            ) from exc
+
+    def _restore_source(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        lexical, _ = self._require_workspace()
+        source_version_id = self._required_source_version_id(
+            params,
+            "source.restore",
+        )
+        temporal = LocalTemporalIndex(lexical)
+        try:
+            temporal.restore_source_version(source_version_id)
+            return temporal.source_detail(source_version_id)
+        except KeyError as exc:
+            raise RpcServiceError(
+                "source_not_found",
+                str(exc),
+            ) from exc
 
     def _import_source(
         self,
@@ -404,6 +588,7 @@ class RpcService:
                 "source_not_found",
                 f"Source file does not exist: {source_path}",
             )
+        self._ensure_embedding_provider_available()
         valid_from_raw = params.get("valid_from")
         valid_from: str | datetime | None = (
             str(valid_from_raw).strip()
@@ -468,6 +653,7 @@ class RpcService:
                 "invalid_params",
                 "query.run requires a non-empty question",
             )
+        self._ensure_embedding_provider_available()
         limit = min(
             max(int(params.get("limit", 10)), 1),
             50,
@@ -567,6 +753,7 @@ class RpcService:
                 "invalid_params",
                 "lab.run requires dataset_fingerprint",
             )
+        self._ensure_embedding_provider_available()
         probe, task_store, job_id = self._begin_task(
             params,
             "lab.run",
@@ -726,6 +913,7 @@ class RpcService:
                 "invalid_params",
                 "attack.run requires manifest_fingerprint and dataset_fingerprint",
             )
+        self._ensure_embedding_provider_available()
         probe, task_store, job_id = self._begin_task(
             params,
             "attack.run",
@@ -869,6 +1057,10 @@ class RpcService:
             return self._workspace_health()
         if method == "workspace.repair":
             return self._workspace_repair()
+        if method == "workspace.backup":
+            return self._workspace_backup(params)
+        if method == "workspace.restore":
+            return self._workspace_restore(params)
         if method == "providers.get":
             return self._provider_snapshot()
         if method == "providers.set":
@@ -881,6 +1073,12 @@ class RpcService:
             return {
                 "sources": self._source_rows(),
             }
+        if method == "source.detail":
+            return self._source_detail(params)
+        if method == "source.archive":
+            return self._archive_source(params)
+        if method == "source.restore":
+            return self._restore_source(params)
         if method == "query.run":
             return self._run_query(params)
         if method == "query.trace":

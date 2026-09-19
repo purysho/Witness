@@ -5,6 +5,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from ..evidence.reconcile import EvidenceReconciler
+from ..retrieval.eligibility import active_source_version_ids
 from ..retrieval.graph import LocalEvidenceGraph
 from ..retrieval.index import LocalEvidenceIndex
 from ..retrieval.temporal import LocalTemporalIndex
@@ -47,13 +48,16 @@ def build_graph_snapshot(index: LocalEvidenceIndex, *, limit: int = 160) -> Grap
     connection = index.connection
     nodes: dict[str, GraphNode] = {}
     edges: dict[str, GraphEdge] = {}
+    active_ids = active_source_version_ids(connection)
+    active_set = None if active_ids is None else set(active_ids)
 
     for row in connection.execute(
         """SELECT source_version_id, title, source_path, valid_from, valid_to
            FROM source_version_metadata
-           ORDER BY valid_from DESC, source_version_id LIMIT ?""",
-        (limit,),
+           ORDER BY valid_from DESC, source_version_id""",
     ).fetchall():
+        if active_set is not None and row["source_version_id"] not in active_set:
+            continue
         node_id = f"source:{row['source_version_id']}"
         nodes[node_id] = GraphNode(node_id, "source", str(row["title"]), {
             "source_version_id": row["source_version_id"],
@@ -61,20 +65,46 @@ def build_graph_snapshot(index: LocalEvidenceIndex, *, limit: int = 160) -> Grap
             "valid_from": row["valid_from"],
             "valid_to": row["valid_to"],
         })
+        if len(nodes) >= limit:
+            break
 
+    active_claim_ids: set[str] = set()
     for row in connection.execute(
-        "SELECT claim_id, text FROM graph_claims ORDER BY claim_id LIMIT ?",
-        (limit,),
+        """
+        SELECT DISTINCT c.claim_id, c.text, chunk.source_version_id
+        FROM graph_claims AS c
+        JOIN graph_claim_evidence AS ge
+          ON ge.claim_id = c.claim_id
+        JOIN indexed_chunks AS chunk
+          ON chunk.chunk_id = ge.chunk_id
+        ORDER BY c.claim_id, chunk.source_version_id
+        """
     ).fetchall():
+        if active_set is not None and row["source_version_id"] not in active_set:
+            continue
+        active_claim_ids.add(str(row["claim_id"]))
         node_id = f"claim:{row['claim_id']}"
-        nodes[node_id] = GraphNode(node_id, "claim", _short(str(row["text"])), {
-            "claim_id": row["claim_id"], "text": row["text"]
-        })
+        if node_id not in nodes:
+            nodes[node_id] = GraphNode(
+                node_id,
+                "claim",
+                _short(str(row["text"])),
+                {"claim_id": row["claim_id"], "text": row["text"]},
+            )
+        if len(active_claim_ids) >= limit:
+            break
 
     for row in connection.execute(
-        "SELECT entity_id, canonical_name FROM graph_entities ORDER BY canonical_name, entity_id LIMIT ?",
-        (limit,),
+        """
+        SELECT DISTINCT e.entity_id, e.canonical_name, ce.claim_id
+        FROM graph_entities AS e
+        JOIN graph_claim_entities AS ce
+          ON ce.entity_id = e.entity_id
+        ORDER BY e.canonical_name, e.entity_id
+        """
     ).fetchall():
+        if str(row["claim_id"]) not in active_claim_ids:
+            continue
         node_id = f"entity:{row['entity_id']}"
         nodes[node_id] = GraphNode(node_id, "entity", str(row["canonical_name"]), {
             "entity_id": row["entity_id"]
@@ -87,10 +117,15 @@ def build_graph_snapshot(index: LocalEvidenceIndex, *, limit: int = 160) -> Grap
            LEFT JOIN evidence_relations AS er
              ON er.left_chunk_id = c.chunk_id OR er.right_chunk_id = c.chunk_id
            WHERE ge.chunk_id IS NOT NULL OR er.relation_id IS NOT NULL
-           ORDER BY c.chunk_id LIMIT ?""",
-        (limit,),
+           ORDER BY c.chunk_id"""
     ).fetchall()
+    emitted_evidence = 0
     for row in evidence_rows:
+        if active_set is not None and row["source_version_id"] not in active_set:
+            continue
+        if emitted_evidence >= limit:
+            break
+        emitted_evidence += 1
         node_id = f"evidence:{row['chunk_id']}"
         nodes[node_id] = GraphNode(node_id, "evidence", _short(str(row["text"])), {
             "chunk_id": row["chunk_id"], "text": row["text"],

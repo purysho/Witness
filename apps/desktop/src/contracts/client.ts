@@ -16,11 +16,14 @@ import {
   type LabRunResult,
   type RpcEnvelope,
   type RpcRequest,
+  type SourceVersionDetail,
   type SourceVersionSummary,
   type VisualEvidencePreview,
+  type WorkspaceBackupResult,
   type WorkspaceHealthReport,
   type WorkspaceOpenResult,
   type WorkspaceRepairResult,
+  type WorkspaceRestoreResult,
 } from "../../../../contracts/generated/rpc";
 
 let sequence = 0;
@@ -51,16 +54,27 @@ export const engine = {
     call<WorkspaceHealthReport>("workspace.health"),
   repairWorkspace: () =>
     call<WorkspaceRepairResult>("workspace.repair"),
+  backupWorkspace: (path: string) =>
+    call<WorkspaceBackupResult>("workspace.backup", { path }),
+  restoreWorkspace: (backupPath: string, destinationPath: string) =>
+    call<WorkspaceRestoreResult>("workspace.restore", {
+      backup_path: backupPath,
+      destination_path: destinationPath,
+    }),
   providerSettings: () =>
     call<ProviderSnapshot>("providers.get"),
   loadDemo: () =>
     call<DemoLoadResult>("demo.load"),
   setProviderSettings: (
+    embeddingMode: "hash" | "sentence-transformers",
+    embeddingModel: string,
     embeddingDimensions: number,
     visualMode: "off" | "hash",
     visualDimensions: number,
   ) =>
     call<ProviderSnapshot>("providers.set", {
+      embedding_mode: embeddingMode,
+      embedding_model: embeddingModel,
       embedding_dimensions: embeddingDimensions,
       visual_mode: visualMode,
       visual_dimensions: visualDimensions,
@@ -73,6 +87,18 @@ export const engine = {
     }),
   listSources: () =>
     call<{ sources: SourceVersionSummary[] }>("source.list"),
+  sourceDetail: (sourceVersionId: string) =>
+    call<SourceVersionDetail>("source.detail", {
+      source_version_id: sourceVersionId,
+    }),
+  archiveSource: (sourceVersionId: string) =>
+    call<SourceVersionDetail>("source.archive", {
+      source_version_id: sourceVersionId,
+    }),
+  restoreSource: (sourceVersionId: string) =>
+    call<SourceVersionDetail>("source.restore", {
+      source_version_id: sourceVersionId,
+    }),
   ask: (question: string, limit = 10) =>
     call<AskResult>("query.run", { question, limit }),
   trace: (runId: string) =>

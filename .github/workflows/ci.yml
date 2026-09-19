@@ -40,6 +40,10 @@ jobs:
         run: python -m pip install -e engine
       - name: Verify generated RPC contracts
         run: python tools/generate-contracts.py --check
+      - name: Verify release version metadata
+        run: python tools/check-version-metadata.py
+      - name: Verify Windows distribution metadata
+        run: python tools/check-distribution-metadata.py
 
   desktop-web:
     runs-on: ubuntu-latest

@@ -166,7 +166,10 @@ class AskEngine:
             },
         )
 
-        reconciliation = self.reconciler.reconcile(retrieval.candidates)
+        reconciliation = self.reconciler.reconcile(
+            retrieval.candidates,
+            query=question,
+        )
         self.run_store.append(
             run_id,
             "evidence.reconciled",

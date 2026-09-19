@@ -164,6 +164,13 @@ class LocalHierarchyIndex:
                     source_version_id=seed.source_version_id,
                     locator=block["locator"],
                     block_id=seed.block_id,
+                    covered_locators=tuple(
+                        dict.fromkeys(
+                            str(row["locator"])
+                            for row in context_rows
+                            if str(row["locator"])
+                        )
+                    ),
                 )
             )
             traces.append(

@@ -54,3 +54,44 @@ Lab runs, exports, or provider snapshots.
 The packaged V1 release guarantees the dependency-free deterministic providers.
 Optional semantic providers remain explicit extras; Witness does not claim a
 semantic model is available when its optional dependency/model is absent.
+
+
+## V1.1 optional semantic text embeddings
+
+V1.1 keeps deterministic hash embeddings as the guaranteed offline default and
+adds an explicit optional text-provider mode:
+
+- `hash` — dependency-free deterministic baseline;
+- `sentence-transformers` — local MiniLM semantic embeddings using
+  `sentence-transformers/all-MiniLM-L6-v2`.
+
+The semantic provider is **local-files-only**. Witness does not silently
+download a model when the provider is selected. A source/dev installation must
+install `witness-engine[embeddings]` and cache the supported model locally
+before selecting it. The packaged Windows baseline remains usable without this
+optional dependency.
+
+Provider settings now persist only:
+
+- text provider mode;
+- semantic model identifier;
+- deterministic hash dimensions;
+- visual provider mode/dimensions;
+- update timestamp.
+
+No credentials, API keys, tokens, or model-provider secrets are accepted or
+stored.
+
+Changing text provider mode creates a distinct vector projection because the
+provider ID is part of each vector's primary identity. Existing deterministic
+vectors remain intact when a semantic projection is built, and vice versa.
+Witness reports `reindex_required` until the active provider projection covers
+the canonical chunks.
+
+Semantic selection is validated before it is saved. If the optional dependency
+or local model is unavailable, `providers.set` fails with
+`provider_unavailable` and the previous workspace settings remain unchanged.
+If a previously selected semantic provider becomes unavailable later, the
+workspace can still open and inspect canonical state; embedding-dependent
+operations fail closed before import/query/Lab/Attack/repair can mutate
+canonical evidence.

@@ -110,28 +110,31 @@ def _clean_token(token: str) -> str:
     return token.strip(".,;:!?()[]{}")
 
 
-def _tokens(text: str) -> set[str]:
+def _surface_tokens(text: str) -> set[str]:
     return {
-        _stem(_clean_token(token))
+        _clean_token(token).casefold()
         for token in _TOKEN_RE.findall(text)
         if _clean_token(token)
     }
 
 
+def _tokens(text: str) -> set[str]:
+    return {_stem(token) for token in _surface_tokens(text)}
+
+
 def _topic_tokens(text: str) -> set[str]:
     values = set()
     for token in _TOKEN_RE.findall(text):
-        cleaned = _clean_token(token)
+        cleaned = _clean_token(token).casefold()
         if not cleaned or _NUMBER_RE.fullmatch(cleaned):
             continue
-        stem = _stem(cleaned)
         if (
-            stem in _STOPWORDS
-            or stem in _NEGATIONS
-            or stem in _POLARITY_TERMS
+            cleaned in _STOPWORDS
+            or cleaned in _NEGATIONS
+            or cleaned in _POLARITY_TERMS
         ):
             continue
-        values.add(stem)
+        values.add(_stem(cleaned))
     return values
 
 
@@ -141,6 +144,14 @@ def _similarity(left: str, right: str) -> float:
     if not a or not b:
         return 0.0
     return len(a & b) / len(a | b)
+
+
+def _claim_relevant_to_query(query: str, claim: str) -> bool:
+    query_topics = _topic_tokens(query)
+    claim_topics = _topic_tokens(claim)
+    if not query_topics or not claim_topics:
+        return False
+    return bool(query_topics & claim_topics)
 
 
 def _contradiction_reason(left: str, right: str) -> str | None:
@@ -153,8 +164,8 @@ def _contradiction_reason(left: str, right: str) -> str | None:
     if left_numbers and right_numbers and left_numbers != right_numbers and similarity >= 0.6:
         return "same topic contains incompatible numeric values"
 
-    left_tokens = _tokens(left)
-    right_tokens = _tokens(right)
+    left_tokens = _surface_tokens(left)
+    right_tokens = _surface_tokens(right)
     left_negated = bool(left_tokens & _NEGATIONS)
     right_negated = bool(right_tokens & _NEGATIONS)
     if left_negated != right_negated and similarity >= 0.6:
@@ -353,6 +364,8 @@ class EvidenceReconciler:
     def reconcile(
         self,
         candidates: tuple[RetrievalCandidate, ...],
+        *,
+        query: str | None = None,
     ) -> ReconciliationResult:
         observations = self._observations(candidates)
         relations: list[EvidenceRelationRecord] = []
@@ -400,6 +413,11 @@ class EvidenceReconciler:
 
             contradiction = _contradiction_reason(left.text, right.text)
             if contradiction is None:
+                continue
+            if query is not None and not (
+                _claim_relevant_to_query(query, left.text)
+                and _claim_relevant_to_query(query, right.text)
+            ):
                 continue
 
             supersession = self._supersession_order(left, right)

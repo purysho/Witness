@@ -6,6 +6,29 @@ Witness is not a chat wrapper over a vector database. It is a local-first retrie
 
 The project is designed to make the hidden parts of retrieval-augmented generation visible. Every answer should be traceable from sentence -> evidence span -> source version -> retrieval path -> ranking decision.
 
+## Download
+
+**Witness v1.1.0 is the current Windows x64 release candidate.**
+
+- [Windows installer (available after publication)](https://github.com/purysho/Witness/releases/download/v1.1.0/Witness_1.1.0_x64-setup.exe)
+- [SHA256SUMS.txt (available after publication)](https://github.com/purysho/Witness/releases/download/v1.1.0/SHA256SUMS.txt)
+- [Release page](https://github.com/purysho/Witness/releases/tag/v1.1.0)
+- [Release notes](RELEASE_NOTES_v1.1.0.md)
+
+The installer is a current-user NSIS package and includes the frozen Witness engine, so Python and a developer environment are not required.
+
+Verify the downloaded installer in PowerShell:
+
+```powershell
+(Get-FileHash .\Witness_1.1.0_x64-setup.exe -Algorithm SHA256).Hash.ToLower()
+```
+
+After publication, compare the result with the value in the release's `SHA256SUMS.txt`.
+
+The v1.1.0 installer is not code-signed yet, so Windows may show a reputation warning. Code signing and update delivery are V1.1 distribution-polish work.
+
+**Updates are manual.** Witness does not contact GitHub or another update service automatically. New releases are downloaded explicitly from GitHub Releases and can be verified with the published SHA-256 checksums. Automatic updating remains disabled until a signed update channel can preserve the same local-first and fail-closed guarantees.
+
 ## Core ideas
 
 - **Evidence before fluency.** The system may abstain when the corpus does not justify an answer.
@@ -61,7 +84,9 @@ Witness is an **evidence and retrieval workbench**, not a general-purpose autono
 - [`docs/evaluation.md`](docs/evaluation.md) — RAG Lab datasets, metrics, snapshots, comparison, and export semantics
 - [`docs/attack-lab.md`](docs/attack-lab.md) — Attack Lab isolation, manifests, invariants, reproducibility, and export
 - [`docs/multimodal.md`](docs/multimodal.md) — visual evidence identity, page-region provenance, asset storage, retrieval, evaluation, and viewer semantics
+- [`docs/distribution.md`](docs/distribution.md) — Windows signing, SmartScreen, release metadata, and update policy
+- [`CHANGELOG.md`](CHANGELOG.md) — release-by-release product changes
 
 ## Status
 
-**Phases 0–8 complete; Witness V1 satisfies the acceptance gate in `SPECIFICATION.md`.** The release candidate includes the full Library/Ask/Trace/Graph/Lab/Attack workflow, versioned mixed-format ingestion, provenance-safe multimodal evidence, cancellable jobs, fail-closed workspace recovery, secret-free provider configuration, the first-run demo, and Windows NSIS packaging. CI verifies Ubuntu/Windows engine tests, generated contracts, the desktop frontend, the Tauri host, frozen-engine persistence, and an installed desktop → bundled-engine RPC round trip.
+**Witness v1.1.0 is in final release-candidate verification.** V1 includes the full Library/Ask/Trace/Graph/Lab/Attack workflow, versioned mixed-format ingestion, provenance-safe multimodal evidence, cancellable jobs, fail-closed workspace recovery, secret-free provider configuration, the first-run demo, and Windows NSIS packaging. CI verifies Ubuntu/Windows engine tests, generated contracts, the desktop frontend, the Tauri host, frozen-engine persistence, and an installed desktop → bundled-engine RPC round trip. See [`V1_1_ROADMAP.md`](V1_1_ROADMAP.md) for the focused hardening backlog.

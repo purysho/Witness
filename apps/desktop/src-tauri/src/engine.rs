@@ -290,19 +290,43 @@ impl EngineClient {
     }
 }
 
-impl Drop for EngineClient {
-    fn drop(&mut self) {
+impl EngineClient {
+    fn shutdown(&mut self) {
         match &mut self.transport {
             EngineTransport::Python { child, .. } => {
                 let _ = child.kill();
                 let _ = child.wait();
             }
-            EngineTransport::Sidecar { child, .. } => {
+            EngineTransport::Sidecar { child, events } => {
                 if let Some(process) = child.take() {
                     let _ = process.kill();
+
+                    // CommandChild::kill only sends the termination signal.
+                    // Keep the desktop alive briefly so Windows releases the
+                    // bundled sidecar executable before app cleanup/uninstall.
+                    let deadline = std::time::Instant::now()
+                        + Duration::from_secs(5);
+                    loop {
+                        let now = std::time::Instant::now();
+                        if now >= deadline {
+                            break;
+                        }
+                        match events.recv_timeout(deadline - now) {
+                            Ok(SidecarEvent::Terminated(_))
+                            | Ok(SidecarEvent::Error(_)) => break,
+                            Ok(SidecarEvent::Stdout(_)) => continue,
+                            Err(_) => break,
+                        }
+                    }
                 }
             }
         }
+    }
+}
+
+impl Drop for EngineClient {
+    fn drop(&mut self) {
+        self.shutdown();
     }
 }
 
@@ -369,6 +393,12 @@ impl EngineState {
                 Self::record_smoke_ready(&response);
                 Ok(response)
             }
+        }
+    }
+
+    pub fn shutdown(&self) {
+        if let Ok(mut guard) = self.client.lock() {
+            *guard = None;
         }
     }
 }

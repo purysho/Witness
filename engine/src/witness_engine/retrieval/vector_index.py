@@ -13,6 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Callable, Sequence
 
+from .eligibility import active_source_version_ids
 from .embeddings import EmbeddingProvider, Vector, normalize
 from .models import RetrievalCandidate
 
@@ -212,6 +213,14 @@ class LocalVectorIndex:
             """,
             (provider.provider_id,),
         ).fetchall()
+        active_ids = active_source_version_ids(self.connection)
+        if active_ids is not None:
+            active_set = set(active_ids)
+            rows = [
+                row
+                for row in rows
+                if row["source_version_id"] in active_set
+            ]
 
         scored: list[tuple[float, sqlite3.Row]] = []
         for row in rows:

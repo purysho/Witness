@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Sequence
 
 from ..chunking import Chunk
+from .eligibility import eligible_source_version_ids
 from .models import RetrievalCandidate
 
 
@@ -191,6 +192,7 @@ class LocalEvidenceIndex:
         limit: int = 10,
         *,
         source_version_ids: Sequence[str] | None = None,
+        include_archived: bool = False,
     ) -> list[RetrievalCandidate]:
         """Search evidence, optionally scoped to immutable source versions."""
         if limit <= 0:
@@ -199,7 +201,11 @@ class LocalEvidenceIndex:
         if not match:
             return []
 
-        source_ids = self._normalized_source_ids(source_version_ids)
+        source_ids = eligible_source_version_ids(
+            self.connection,
+            self._normalized_source_ids(source_version_ids),
+            include_archived=include_archived,
+        )
         if source_ids == ():
             return []
 
@@ -250,13 +256,18 @@ class LocalEvidenceIndex:
         *,
         limit: int = 10,
         method: str = "source-scan",
+        include_archived: bool = False,
     ) -> list[RetrievalCandidate]:
         """Return deterministic evidence rows for already-selected source versions.
 
         Specialized routes use this as a fallback when temporal or graph selection
         is meaningful but the remaining lexical query has no searchable terms.
         """
-        source_ids = self._normalized_source_ids(source_version_ids)
+        source_ids = eligible_source_version_ids(
+            self.connection,
+            self._normalized_source_ids(source_version_ids),
+            include_archived=include_archived,
+        )
         if limit <= 0 or not source_ids:
             return []
         placeholders = ",".join("?" for _ in source_ids)

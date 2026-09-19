@@ -9,6 +9,7 @@ from typing import Callable, Iterable
 from ..chunking import Chunk
 from ..graph.extraction import ClaimExtractionProvider, DeterministicClaimExtractionProvider
 from ..ids import stable_id
+from .eligibility import active_source_version_ids
 from .index import LocalEvidenceIndex
 from .models import RetrievalCandidate
 
@@ -280,6 +281,14 @@ class LocalEvidenceGraph:
                 """,
                 (claim_id,),
             ).fetchall()
+            active_ids = active_source_version_ids(self.connection)
+            if active_ids is not None:
+                active_set = set(active_ids)
+                evidence_rows = [
+                    row
+                    for row in evidence_rows
+                    if row["source_version_id"] in active_set
+                ]
             entity_rows = self.connection.execute(
                 """
                 SELECT entity_id FROM graph_claim_entities

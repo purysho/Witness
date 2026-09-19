@@ -61,8 +61,13 @@ try {
 }
 finally {
     if ($appProcess -and -not $appProcess.HasExited) {
-        Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
-        $appProcess.WaitForExit(5000) | Out-Null
+        Write-Host "Closing installed Witness desktop normally"
+        $null = $appProcess.CloseMainWindow()
+        if (-not $appProcess.WaitForExit(10000)) {
+            Write-Warning "Witness desktop did not exit after CloseMainWindow; forcing smoke cleanup."
+            Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
+            $appProcess.WaitForExit(5000) | Out-Null
+        }
     }
     Remove-Item -Force $readyFile -ErrorAction SilentlyContinue
     if ($null -eq $previousReadyFile) {
@@ -72,16 +77,47 @@ finally {
     }
 }
 
-$uninstaller = Get-ChildItem -Path $installDir -Recurse -File -Filter "*uninstall*.exe" | Select-Object -First 1
-if ($uninstaller) {
-    Write-Host "Uninstalling smoke package: $($uninstaller.FullName)"
-    $uninstall = Start-Process -FilePath $uninstaller.FullName -ArgumentList "/S" -Wait -PassThru
-    if ($uninstall.ExitCode -ne 0) {
-        throw "Witness uninstaller exited with code $($uninstall.ExitCode)"
-    }
-} else {
-    Write-Warning "No uninstaller was found; removing smoke directory directly."
-    Remove-Item -Recurse -Force $installDir -ErrorAction SilentlyContinue
+$uninstaller = Get-ChildItem -Path $installDir -Recurse -File -Filter "*.exe" | Where-Object {
+    $_.Name -match "(?i)(uninstall|unins)"
+} | Select-Object -First 1
+if (-not $uninstaller) {
+    throw "Installed Witness package does not contain an uninstaller"
 }
 
-Write-Host "Installed Witness package smoke passed."
+$appPath = $app.FullName
+$enginePath = $engine.FullName
+Write-Host "Uninstalling smoke package: $($uninstaller.FullName)"
+$uninstall = Start-Process -FilePath $uninstaller.FullName -ArgumentList "/S" -Wait -PassThru
+if ($uninstall.ExitCode -ne 0) {
+    throw "Witness uninstaller exited with code $($uninstall.ExitCode)"
+}
+
+# NSIS may finish self-removal just after the uninstaller process exits. Give it
+# a bounded grace period, then require the installed product binaries to be gone.
+$uninstallDeadline = [DateTime]::UtcNow.AddSeconds(20)
+while ([DateTime]::UtcNow -lt $uninstallDeadline) {
+    if (-not (Test-Path $appPath) -and -not (Test-Path $enginePath)) {
+        break
+    }
+    Start-Sleep -Milliseconds 250
+}
+
+if (Test-Path $appPath) {
+    throw "Witness uninstaller left the desktop executable behind: $appPath"
+}
+if (Test-Path $enginePath) {
+    throw "Witness uninstaller left the bundled engine behind: $enginePath"
+}
+
+if (Test-Path $installDir) {
+    $leftovers = @(Get-ChildItem -Path $installDir -Recurse -Force -ErrorAction SilentlyContinue)
+    if ($leftovers.Count -gt 0) {
+        Write-Warning (
+            "Witness uninstaller removed product binaries but left " +
+            $leftovers.Count +
+            " non-product path(s) under the smoke install directory."
+        )
+    }
+}
+
+Write-Host "Installed Witness package install / launch / bundled-engine RPC / uninstall smoke passed."

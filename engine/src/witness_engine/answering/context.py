@@ -22,6 +22,7 @@ class ContextEvidence:
     evidence_kind: str = "text"
     visual_evidence_id: str = ""
     modality: str = ""
+    covered_locators: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -70,6 +71,7 @@ def build_context_pack(
             evidence_kind=candidate.evidence_kind,
             visual_evidence_id=candidate.visual_evidence_id,
             modality=candidate.modality,
+            covered_locators=candidate.covered_locators,
         )
         for candidate in candidates
     )

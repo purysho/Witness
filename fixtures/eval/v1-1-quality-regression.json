@@ -1,0 +1,167 @@
+{
+  "schema_version": 1,
+  "dataset_id": "witness-v1-1-quality-regression-v1",
+  "name": "Witness V1.1 quality regression",
+  "description": "Deterministic post-release benchmark for exact, temporal, duplicate, contradiction, abstention, graph and hierarchical retrieval.",
+  "cases": [
+    {
+      "case_id": "exact-request-id",
+      "question": "What header is required for authenticated API requests?",
+      "gold_evidence": [
+        {
+          "source_path": "authentication.md",
+          "locator": "line:7"
+        },
+        {
+          "source_path": "authentication-copy.md",
+          "locator": "line:7"
+        }
+      ],
+      "expected_state": "SUFFICIENT",
+      "expected_answer_contains": [
+        "X-Request-ID"
+      ],
+      "tags": [
+        "exact",
+        "duplicate",
+        "citation"
+      ]
+    },
+    {
+      "case_id": "duplicate-token-rotation",
+      "question": "How often are access tokens rotated?",
+      "gold_evidence": [
+        {
+          "source_path": "authentication.md",
+          "locator": "line:5"
+        },
+        {
+          "source_path": "authentication-copy.md",
+          "locator": "line:5"
+        }
+      ],
+      "expected_state": "SUFFICIENT",
+      "expected_answer_contains": [
+        "90 days"
+      ],
+      "tags": [
+        "duplicate",
+        "retrieval",
+        "citation"
+      ]
+    },
+    {
+      "case_id": "current-api-port",
+      "question": "What port does the current API use?",
+      "gold_evidence": [
+        {
+          "source_path": "api-handbook-2026.md",
+          "locator": "line:3"
+        }
+      ],
+      "expected_state": "SUFFICIENT",
+      "expected_answer_contains": [
+        "5200"
+      ],
+      "tags": [
+        "temporal",
+        "current",
+        "citation"
+      ]
+    },
+    {
+      "case_id": "historical-api-port",
+      "question": "What port did the API use in 2025?",
+      "gold_evidence": [
+        {
+          "source_path": "api-handbook-2025.md",
+          "locator": "line:3"
+        }
+      ],
+      "expected_state": "SUFFICIENT",
+      "expected_answer_contains": [
+        "4100"
+      ],
+      "tags": [
+        "temporal",
+        "historical",
+        "citation"
+      ]
+    },
+    {
+      "case_id": "atlas-conflict",
+      "question": "Is the Atlas feature flag enabled or disabled for production traffic?",
+      "gold_evidence": [
+        {
+          "source_path": "feature-enabled.md",
+          "locator": "line:3"
+        },
+        {
+          "source_path": "feature-disabled.md",
+          "locator": "line:3"
+        }
+      ],
+      "expected_state": "CONFLICTED",
+      "tags": [
+        "contradiction",
+        "conflict",
+        "reconciliation"
+      ]
+    },
+    {
+      "case_id": "missing-encryption",
+      "question": "What database encryption algorithm is required?",
+      "gold_evidence": [],
+      "expected_state": "INSUFFICIENT",
+      "tags": [
+        "abstention"
+      ]
+    },
+    {
+      "case_id": "service-dependency",
+      "question": "How is Authentication Service connected to Token Service?",
+      "gold_evidence": [
+        {
+          "source_path": "services.md",
+          "locator": "line:3"
+        },
+        {
+          "source_path": "services.md",
+          "locator": "line:5"
+        }
+      ],
+      "expected_state": "SUFFICIENT",
+      "tags": [
+        "graph",
+        "relational",
+        "multi-hop"
+      ]
+    },
+    {
+      "case_id": "recovery-flow",
+      "question": "Summarize the authentication recovery process.",
+      "gold_evidence": [
+        {
+          "source_path": "recovery.md",
+          "locator": "line:5"
+        },
+        {
+          "source_path": "recovery.md",
+          "locator": "line:7"
+        },
+        {
+          "source_path": "recovery.md",
+          "locator": "line:9"
+        }
+      ],
+      "expected_state": "SUFFICIENT",
+      "expected_answer_contains": [
+        "fresh login"
+      ],
+      "tags": [
+        "hierarchical",
+        "summary"
+      ]
+    }
+  ]
+}
