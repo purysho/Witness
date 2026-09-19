@@ -2,10 +2,10 @@ mod commands;
 mod engine;
 mod security;
 
-use tauri::Manager;
+use tauri::{Manager, RunEvent};
 
 fn main() {
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
@@ -16,6 +16,12 @@ fn main() {
             commands::engine_call,
             commands::cancel_job
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Witness desktop");
+        .build(tauri::generate_context!())
+        .expect("error while building Witness desktop");
+
+    app.run(|app_handle, event| {
+        if matches!(event, RunEvent::Exit) {
+            app_handle.state::<engine::EngineState>().shutdown();
+        }
+    });
 }
