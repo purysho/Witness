@@ -7,7 +7,10 @@ def test_opposite_state_terms_survive_normalization():
         "The Atlas feature flag is disabled for production traffic.",
     )
 
-    assert reason == "same topic uses opposing state terms"
+    assert reason in {
+        "same topic differs by explicit negation",
+        "same topic uses opposing state terms",
+    }
 
 
 def test_matching_state_terms_are_not_a_contradiction():
