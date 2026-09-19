@@ -95,6 +95,41 @@ def _route_summary(ask_result: dict | None) -> dict[str, object]:
     }
 
 
+def _candidate_provenance(ask_result: dict | None) -> list[dict[str, object]]:
+    retrieval = (ask_result or {}).get("retrieval") or {}
+    candidates = retrieval.get("candidates") or []
+    return [
+        {
+            "chunk_id": item.get("chunk_id"),
+            "source_version_id": item.get("source_version_id"),
+            "locator": item.get("locator"),
+            "rank": item.get("rank"),
+            "method": item.get("method"),
+            "evidence_kind": item.get("evidence_kind"),
+            "visual_evidence_id": item.get("visual_evidence_id"),
+            "modality": item.get("modality"),
+        }
+        for item in candidates
+    ]
+
+
+def _citation_provenance(ask_result: dict | None) -> list[dict[str, object]]:
+    answer = (ask_result or {}).get("answer") or {}
+    citations = answer.get("citations") or []
+    return [
+        {
+            "evidence_id": item.get("evidence_id"),
+            "chunk_id": item.get("chunk_id"),
+            "source_version_id": item.get("source_version_id"),
+            "locator": item.get("locator"),
+            "evidence_kind": item.get("evidence_kind"),
+            "visual_evidence_id": item.get("visual_evidence_id"),
+            "modality": item.get("modality"),
+        }
+        for item in citations
+    ]
+
+
 def _case_payload(case) -> dict[str, object]:
     metrics = case.metrics.model_dump(mode="json")
     return {
@@ -109,6 +144,8 @@ def _case_payload(case) -> dict[str, object]:
         "metrics": metrics,
         "relations": _relation_counts(case.ask_result),
         "routes": _route_summary(case.ask_result),
+        "retrieval_candidates": _candidate_provenance(case.ask_result),
+        "answer_citations": _citation_provenance(case.ask_result),
     }
 
 
