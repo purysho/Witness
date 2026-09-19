@@ -1,6 +1,6 @@
 [project]
 name = "witness-engine"
-version = "0.1.0"
+version = "1.0.0"
 description = "Evidence-first RAG engine"
 requires-python = ">=3.12"
 dependencies = [
