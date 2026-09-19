@@ -80,6 +80,17 @@ def _best_sentence(question: str, text: str) -> tuple[str, float]:
     return sentence, float(score)
 
 
+def _content_sentences(text: str) -> tuple[str, ...]:
+    values: list[str] = []
+    for raw in _SENTENCE_RE.split(text):
+        sentence = " ".join(raw.strip().split())
+        if not sentence or sentence.startswith("#"):
+            continue
+        if sentence not in values:
+            values.append(sentence)
+    return tuple(values)
+
+
 @dataclass(frozen=True)
 class DeterministicExtractiveGenerationProvider:
     """Offline reference generator used to prove grounding and citation plumbing.
@@ -174,6 +185,25 @@ class DeterministicExtractiveGenerationProvider:
 
         sentences: list[GeneratedSentence] = []
         seen_text: set[str] = set()
+
+        if features.broad_summary and scored:
+            _relevance, _rank, evidence_id, _text = scored[0]
+            structural_sentences = _content_sentences(by_id[evidence_id].text)
+            if len(structural_sentences) >= 2:
+                for text in structural_sentences[:target_sentences]:
+                    normalized = text.casefold()
+                    if normalized in seen_text:
+                        continue
+                    seen_text.add(normalized)
+                    sentences.append(
+                        GeneratedSentence(text, (evidence_id,))
+                    )
+                if sentences:
+                    return GeneratedAnswer(
+                        state=context.sufficiency_state,
+                        sentences=tuple(sentences),
+                    )
+
         for _relevance, _rank, evidence_id, text in scored:
             normalized = text.casefold()
             if normalized in seen_text:
