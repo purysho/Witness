@@ -226,6 +226,22 @@ Exit gate:
 - unsupported-claim, citation, contradiction, and abstention metrics do not
   regress silently.
 
+**Status:** complete and benchmarked on the V1.1 branch. The immutable
+`witness-v1-1-quality-regression-v1` dataset (fingerprint
+`2f427210f2f8349e63ce8a5c3241f53727c0ab4a3e5136f7016a146a61aef513`)
+covers exact facts, duplicate evidence, current/historical temporal retrieval,
+contradiction handling, abstention, graph retrieval, and hierarchical summary
+retrieval. Against the unchanged corpus fingerprint
+`177bfdcc4e5e689fc38b211d265de43e43fd559ef2ccb53ccfbc592134529955`,
+the final routed baseline passed 8/8 cases with Recall@K 1.0, MRR 1.0,
+citation precision 1.0, state accuracy 1.0, abstention correctness 1.0,
+contradiction handling 1.0, answer-fragment accuracy 1.0, and unsupported-claim
+rate 0. Accepted changes were driven by repeated runs of the same dataset:
+duplicate-safe nDCG scoring, query-scoped contradiction reconciliation,
+a stricter abstention boundary, focused deterministic extraction, structural
+broad-summary generation, and explicit hierarchical covered-locator provenance.
+The final benchmark is Quality Baseline run `35439951846`.
+
 ---
 
 ## Slice 6 — Optional semantic providers
