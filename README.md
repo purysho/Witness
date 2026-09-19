@@ -8,10 +8,10 @@ The project is designed to make the hidden parts of retrieval-augmented generati
 
 ## Download
 
-**Witness v1.1.0 is the current Windows x64 release candidate.**
+**Witness v1.1.0 is released for Windows x64.**
 
-- [Windows installer (available after publication)](https://github.com/purysho/Witness/releases/download/v1.1.0/Witness_1.1.0_x64-setup.exe)
-- [SHA256SUMS.txt (available after publication)](https://github.com/purysho/Witness/releases/download/v1.1.0/SHA256SUMS.txt)
+- [Download the Windows installer](https://github.com/purysho/Witness/releases/download/v1.1.0/Witness_1.1.0_x64-setup.exe)
+- [SHA256SUMS.txt](https://github.com/purysho/Witness/releases/download/v1.1.0/SHA256SUMS.txt)
 - [Release page](https://github.com/purysho/Witness/releases/tag/v1.1.0)
 - [Release notes](RELEASE_NOTES_v1.1.0.md)
 
@@ -23,9 +23,15 @@ Verify the downloaded installer in PowerShell:
 (Get-FileHash .\Witness_1.1.0_x64-setup.exe -Algorithm SHA256).Hash.ToLower()
 ```
 
-After publication, compare the result with the value in the release's `SHA256SUMS.txt`.
+Expected SHA-256:
 
-The v1.1.0 installer is not code-signed yet, so Windows may show a reputation warning. Code signing and update delivery are V1.1 distribution-polish work.
+```text
+d092c31bc2888fa8d4d35e2cb4a26af7a925fe4a4bb96c496e4524f952fc267c
+```
+
+Compare it with the value in the release's `SHA256SUMS.txt`.
+
+The v1.1.0 installer is not code-signed yet, so Windows may show a reputation warning. A signing/SmartScreen strategy is documented for a future trusted signing identity; V1.1 keeps updates explicit and manual.
 
 **Updates are manual.** Witness does not contact GitHub or another update service automatically. New releases are downloaded explicitly from GitHub Releases and can be verified with the published SHA-256 checksums. Automatic updating remains disabled until a signed update channel can preserve the same local-first and fail-closed guarantees.
 
@@ -89,4 +95,4 @@ Witness is an **evidence and retrieval workbench**, not a general-purpose autono
 
 ## Status
 
-**Witness v1.1.0 is in final release-candidate verification.** V1 includes the full Library/Ask/Trace/Graph/Lab/Attack workflow, versioned mixed-format ingestion, provenance-safe multimodal evidence, cancellable jobs, fail-closed workspace recovery, secret-free provider configuration, the first-run demo, and Windows NSIS packaging. CI verifies Ubuntu/Windows engine tests, generated contracts, the desktop frontend, the Tauri host, frozen-engine persistence, and an installed desktop → bundled-engine RPC round trip. See [`V1_1_ROADMAP.md`](V1_1_ROADMAP.md) for the focused hardening backlog.
+**Witness v1.1.0 is released.** V1 includes the full Library/Ask/Trace/Graph/Lab/Attack workflow, versioned mixed-format ingestion, provenance-safe multimodal evidence, cancellable jobs, fail-closed workspace recovery, secret-free provider configuration, the first-run demo, and Windows NSIS packaging. CI verifies Ubuntu/Windows engine tests, generated contracts, the desktop frontend, the Tauri host, frozen-engine persistence, and an installed desktop → bundled-engine RPC round trip. See [`V1_1_ROADMAP.md`](V1_1_ROADMAP.md) for the focused hardening backlog.
