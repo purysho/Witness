@@ -11,6 +11,7 @@ import type {
   GraphSnapshot,
   LabComparison,
   ProviderSnapshot,
+  SourceVersionDetail,
   SourceVersionSummary,
   VisualEvidencePreview,
   WorkspaceHealthReport,
@@ -69,6 +70,7 @@ export function App() {
   const [sourcePath, setSourcePath] = useState("");
   const [validFrom, setValidFrom] = useState("");
   const [sources, setSources] = useState<SourceVersionSummary[]>([]);
+  const [selectedSource, setSelectedSource] = useState<SourceVersionDetail | null>(null);
   const [question, setQuestion] = useState("");
   const [result, setResult] = useState<AskResult | null>(null);
   const [graph, setGraph] = useState<GraphSnapshot | null>(null);
@@ -142,6 +144,7 @@ export function App() {
       setWorkspace(opened);
       setWorkspaceHealth(null);
       setProviders(null);
+      setSelectedSource(null);
       setResult(null);
       setGraph(null);
       setLabComparison(null);
@@ -264,6 +267,7 @@ export function App() {
         refreshProviders(),
       ]);
       setSourcePath("");
+      setSelectedSource(null);
       setStatus(
         "Source indexed into lexical, dense, temporal, hierarchy, graph, and visual projections.",
       );
@@ -276,6 +280,60 @@ export function App() {
       }
     } finally {
       setActiveJob((current) => current?.id === jobId ? null : current);
+      setBusy(false);
+    }
+  }
+
+  async function inspectSource(sourceVersionId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const detail = await engine.sourceDetail(sourceVersionId);
+      setSelectedSource(detail);
+      setStatus(
+        "Source detail loaded · " +
+          detail.version_chain.length +
+          " version" +
+          (detail.version_chain.length === 1 ? "" : "s") +
+          " in chain",
+      );
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function archiveSource(sourceVersionId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const detail = await engine.archiveSource(sourceVersionId);
+      await refreshSources();
+      setSelectedSource(detail);
+      setGraph(null);
+      setStatus(
+        "Source archived · canonical evidence and prior Trace history retained.",
+      );
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function restoreSource(sourceVersionId: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      const detail = await engine.restoreSource(sourceVersionId);
+      await refreshSources();
+      setSelectedSource(detail);
+      setGraph(null);
+      setStatus("Source restored · retrieval eligibility recalculated.");
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
       setBusy(false);
     }
   }
@@ -828,12 +886,17 @@ export function App() {
           sourcePath={sourcePath}
           validFrom={validFrom}
           sources={sources}
+          selectedSource={selectedSource}
           busy={busy}
           workspaceReady={Boolean(workspace)}
           onSourcePath={setSourcePath}
           onValidFrom={setValidFrom}
           onBrowseSource={browseSource}
           onImport={importSource}
+          onInspectSource={inspectSource}
+          onArchiveSource={archiveSource}
+          onRestoreSource={restoreSource}
+          onClearSourceDetails={() => setSelectedSource(null)}
         />
 
         <section className="surface">

@@ -16,6 +16,7 @@ import {
   type LabRunResult,
   type RpcEnvelope,
   type RpcRequest,
+  type SourceVersionDetail,
   type SourceVersionSummary,
   type VisualEvidencePreview,
   type WorkspaceHealthReport,
@@ -73,6 +74,18 @@ export const engine = {
     }),
   listSources: () =>
     call<{ sources: SourceVersionSummary[] }>("source.list"),
+  sourceDetail: (sourceVersionId: string) =>
+    call<SourceVersionDetail>("source.detail", {
+      source_version_id: sourceVersionId,
+    }),
+  archiveSource: (sourceVersionId: string) =>
+    call<SourceVersionDetail>("source.archive", {
+      source_version_id: sourceVersionId,
+    }),
+  restoreSource: (sourceVersionId: string) =>
+    call<SourceVersionDetail>("source.restore", {
+      source_version_id: sourceVersionId,
+    }),
   ask: (question: string, limit = 10) =>
     call<AskResult>("query.run", { question, limit }),
   trace: (runId: string) =>

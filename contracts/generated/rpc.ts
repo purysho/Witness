@@ -20,7 +20,9 @@ export interface ProviderSnapshot {
   secret_policy:string;
 }
 export interface DemoLoadResult { source_versions:Record<string,string>; dataset:EvalDatasetSummary; attack_manifest:AttackManifestSummary; suggested_question:string; source_directory:string; artifact_directory:string; }
-export interface SourceVersionSummary { source_version_id:string; logical_source_id:string; source_path:string; title:string; media_type:string; valid_from:string; valid_to:string|null; supersedes_source_version_id:string|null; superseded_by_source_version_id:string|null; }
+export interface SourceVersionSummary { source_version_id:string; logical_source_id:string; source_path:string; title:string; media_type:string; valid_from:string; valid_to:string|null; supersedes_source_version_id:string|null; superseded_by_source_version_id:string|null; archived_at:string|null; archived:boolean; }
+export interface SourceVersionChainItem { source_version_id:string; valid_from:string; valid_to:string|null; supersedes_source_version_id:string|null; superseded_by_source_version_id:string|null; archived_at:string|null; archived:boolean; }
+export interface SourceVersionDetail extends SourceVersionSummary { observed_at:string; chunk_count:number; version_chain:SourceVersionChainItem[]; }
 export interface ContextEvidence { evidence_id:string; chunk_id:string; text:string; source_version_id:string; locator:string|null; method:string; rank:number; evidence_kind:string; visual_evidence_id:string; modality:string; }
 export interface Citation { evidence_id:string; chunk_id:string; source_version_id:string; locator:string|null; evidence_kind:string; visual_evidence_id:string; modality:string; }
 export interface AnswerSentence { text:string; evidence_ids:string[]; }
