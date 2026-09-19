@@ -15,6 +15,11 @@ from pydantic import ValidationError
 
 from ..attack import AttackManifest, AttackRunner, AttackStore, export_attack_run
 from ..answering import LocalRunStore
+from ..backup import (
+    WorkspaceBackupError,
+    create_workspace_backup,
+    restore_workspace_backup,
+)
 from ..demo import install_demo_pack
 from ..evaluation import (
     EvalConfig,
@@ -62,6 +67,8 @@ ALLOWED_METHODS = frozenset(
         "workspace.open",
         "workspace.health",
         "workspace.repair",
+        "workspace.backup",
+        "workspace.restore",
         "providers.get",
         "providers.set",
         "demo.load",
@@ -323,6 +330,59 @@ class RpcService:
             visual_index=self.visual_index,
             visual_embedding_provider=self.visual_embedding_provider,
         ).to_dict()
+
+    def _workspace_backup(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        lexical, _ = self._require_workspace()
+        assert self.workspace_path is not None
+        raw_path = str(params.get("path", "")).strip()
+        if not raw_path:
+            raise RpcServiceError(
+                "invalid_params",
+                "workspace.backup requires path",
+            )
+        try:
+            return create_workspace_backup(
+                lexical.connection,
+                self.workspace_path,
+                raw_path,
+            )
+        except (WorkspaceBackupError, OSError) as exc:
+            raise RpcServiceError(
+                "workspace_backup_failed",
+                str(exc),
+            ) from exc
+
+    def _workspace_restore(
+        self,
+        params: dict[str, Any],
+    ) -> dict[str, Any]:
+        backup_path = str(
+            params.get("backup_path", "")
+        ).strip()
+        destination_path = str(
+            params.get("destination_path", "")
+        ).strip()
+        if not backup_path or not destination_path:
+            raise RpcServiceError(
+                "invalid_params",
+                (
+                    "workspace.restore requires "
+                    "backup_path and destination_path"
+                ),
+            )
+        try:
+            return restore_workspace_backup(
+                backup_path,
+                destination_path,
+            )
+        except (WorkspaceBackupError, OSError) as exc:
+            raise RpcServiceError(
+                "workspace_restore_failed",
+                str(exc),
+            ) from exc
 
     def _begin_task(
         self,
@@ -950,6 +1010,10 @@ class RpcService:
             return self._workspace_health()
         if method == "workspace.repair":
             return self._workspace_repair()
+        if method == "workspace.backup":
+            return self._workspace_backup(params)
+        if method == "workspace.restore":
+            return self._workspace_restore(params)
         if method == "providers.get":
             return self._provider_snapshot()
         if method == "providers.set":
