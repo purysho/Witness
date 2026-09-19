@@ -2,6 +2,10 @@ name: Quality Baseline
 
 on:
   workflow_dispatch:
+  push:
+    branches: [v1.1]
+    paths:
+      - ".github/quality-trigger-v1.1"
 
 jobs:
   windows-quality:
