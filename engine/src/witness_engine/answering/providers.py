@@ -151,10 +151,20 @@ class DeterministicExtractiveGenerationProvider:
                 "versions",
             }
         )
+        evidence_kinds = {
+            item.evidence_kind
+            for item in context.evidence
+        }
+        compound_multimodal = bool(
+            features.visual_signals
+            and "and" in features.tokens
+            and len(evidence_kinds) > 1
+        )
         multi_evidence = (
             features.broad_summary
             or features.comparison
             or temporal_multi
+            or compound_multimodal
         )
         target_sentences = (
             max(self.max_sentences, 1)
