@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="420" viewBox="0 0 1200 420" role="img" aria-labelledby="title desc">
+<title id="title">Witness evidence flow</title>
+<desc id="desc">A dark technical diagram showing sources moving through retrieval, evidence reconciliation, a sufficiency gate, and into an answer with citations and trace.</desc>
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#090b12"/><stop offset="1" stop-color="#11121b"/></linearGradient>
+  <linearGradient id="panel" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#171923"/><stop offset="1" stop-color="#0d0f16"/></linearGradient>
+  <filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+</defs>
+<rect width="1200" height="420" rx="28" fill="url(#bg)" stroke="#282a36"/>
+<text x="48" y="54" fill="#a991ff" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" letter-spacing="3">WITNESS / EVIDENCE FLOW</text>
+<text x="48" y="88" fill="#f1eee8" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="23" font-weight="600">From source material to an answer you can inspect.</text>
+
+<g font-family="Inter,Segoe UI,Arial,sans-serif">
+  <rect x="48" y="145" width="170" height="150" rx="18" fill="url(#panel)" stroke="#363946"/>
+  <text x="70" y="177" fill="#7bdcff" font-size="11" font-weight="700" letter-spacing="2">SOURCES</text>
+  <rect x="70" y="198" width="126" height="18" rx="5" fill="#242936"/><rect x="70" y="227" width="98" height="18" rx="5" fill="#242936"/><rect x="70" y="256" width="114" height="18" rx="5" fill="#242936"/>
+  <text x="70" y="324" fill="#747b8b" font-size="10">VERSIONED · UNTRUSTED INPUT</text>
+
+  <rect x="270" y="132" width="210" height="176" rx="18" fill="url(#panel)" stroke="#37374a"/>
+  <text x="292" y="164" fill="#a991ff" font-size="11" font-weight="700" letter-spacing="2">RETRIEVAL</text>
+  <text x="292" y="197" fill="#d9d5e4" font-size="13">Lexical / BM25</text>
+  <text x="292" y="222" fill="#d9d5e4" font-size="13">Dense vector</text>
+  <text x="292" y="247" fill="#d9d5e4" font-size="13">Graph + temporal</text>
+  <text x="292" y="272" fill="#d9d5e4" font-size="13">Fusion + reranking</text>
+
+  <rect x="534" y="132" width="210" height="176" rx="18" fill="url(#panel)" stroke="#514739"/>
+  <text x="556" y="164" fill="#e0b45e" font-size="11" font-weight="700" letter-spacing="2">EVIDENCE</text>
+  <text x="556" y="198" fill="#ddd7cb" font-size="13">Exact spans</text>
+  <text x="556" y="223" fill="#ddd7cb" font-size="13">Support + contradiction</text>
+  <text x="556" y="248" fill="#ddd7cb" font-size="13">Source-version context</text>
+  <text x="556" y="273" fill="#ddd7cb" font-size="13">Reconciliation</text>
+
+  <rect x="798" y="145" width="150" height="150" rx="75" fill="#15131a" stroke="#d0a657" stroke-width="2"/>
+  <circle cx="873" cy="220" r="52" fill="none" stroke="#3e3745" stroke-width="8"/>
+  <circle cx="873" cy="220" r="29" fill="none" stroke="#a991ff" stroke-width="7"/>
+  <circle cx="873" cy="220" r="10" fill="#d9aa52" filter="url(#glow)"/>
+  <text x="873" y="328" text-anchor="middle" fill="#d9aa52" font-size="10" font-weight="700" letter-spacing="1.7">SUFFICIENCY GATE</text>
+
+  <rect x="1002" y="132" width="150" height="176" rx="18" fill="url(#panel)" stroke="#374152"/>
+  <text x="1024" y="164" fill="#7bdcff" font-size="11" font-weight="700" letter-spacing="2">ANSWER</text>
+  <text x="1024" y="201" fill="#ece9e2" font-size="13">Claim</text>
+  <text x="1024" y="226" fill="#ece9e2" font-size="13">↳ citation</text>
+  <text x="1024" y="251" fill="#ece9e2" font-size="13">↳ evidence span</text>
+  <text x="1024" y="276" fill="#ece9e2" font-size="13">↳ full trace</text>
+</g>
+
+<g fill="none" stroke-linecap="round">
+  <path d="M218 220H270" stroke="#4a5363" stroke-width="3"/>
+  <path d="M480 220H534" stroke="#665d6f" stroke-width="3"/>
+  <path d="M744 220H798" stroke="#7b6745" stroke-width="3"/>
+  <path d="M948 220H1002" stroke="#6b5a76" stroke-width="3"/>
+</g>
+<g fill="#8991a0">
+  <path d="M262 214l12 6-12 6z"/><path d="M526 214l12 6-12 6z"/><path d="M790 214l12 6-12 6z"/><path d="M994 214l12 6-12 6z"/>
+</g>
+<text x="48" y="378" fill="#676e7d" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="11" letter-spacing="1.3">RETRIEVE WHAT MATTERS · SHOW WHAT SUPPORTS IT · SURFACE WHAT CONFLICTS · ABSTAIN WHEN THE EVIDENCE IS NOT ENOUGH</text>
+</svg>
