@@ -77,31 +77,31 @@ Before tagging `v1.1.0`:
   - Rust desktop crate;
   - Python engine package;
   - Python runtime `__version__`.
-- [ ] `python tools/check-version-metadata.py` passes.
-- [ ] `python tools/check-distribution-metadata.py` passes.
+- [x] `python tools/check-version-metadata.py` passes.
+- [x] `python tools/check-distribution-metadata.py` passes.
 - [x] Draft marker is removed from `RELEASE_NOTES_v1.1.0.md`.
 - [x] `CHANGELOG.md` moves V1.1 from Unreleased to `1.1.0`.
 - [x] README download/checksum/release-note links target `v1.1.0`.
-- [ ] Engine tests · Ubuntu pass.
-- [ ] Engine tests · Windows pass.
-- [ ] Generated RPC contracts pass.
-- [ ] Desktop TypeScript/build passes.
-- [ ] Windows Rust/Tauri host check passes.
-- [ ] Frozen sidecar + installed NSIS smoke passes.
-- [ ] PR #15 is ready and mergeable.
+- [x] Engine tests · Ubuntu pass.
+- [x] Engine tests · Windows pass.
+- [x] Generated RPC contracts pass.
+- [x] Desktop TypeScript/build passes.
+- [x] Windows Rust/Tauri host check passes.
+- [x] Frozen sidecar + installed NSIS smoke passes.
+- [x] PR #15 was marked ready and merged at verified head `d9f82353`.
 
 ## Publication gate
 
 After the release candidate is merged to `main`:
 
-- [ ] `main` CI is green on the merge commit.
-- [ ] Tag `v1.1.0` points at that verified `main` commit.
-- [ ] Tagged Release Windows workflow passes its metadata/tag guard.
-- [ ] Installer is published.
-- [ ] `SHA256SUMS.txt` is published.
-- [ ] Checked-in `RELEASE_NOTES_v1.1.0.md` is used for the release body.
-- [ ] Published installer SHA-256 matches `SHA256SUMS.txt`.
-- [ ] Release page and README download links resolve.
+- [x] `main` CI is green on merge commit `e398fbdc` and publication commit `37940db5`.
+- [x] Tag `v1.1.0` points at verified `main` publication commit `37940db5`.
+- [x] The one-shot Windows publication workflow passed version/tag and distribution metadata guards.
+- [x] `Witness_1.1.0_x64-setup.exe` is published.
+- [x] `SHA256SUMS.txt` is published.
+- [x] Checked-in `RELEASE_NOTES_v1.1.0.md` is used for the release body.
+- [x] Published installer SHA-256 is `d092c31bc2888fa8d4d35e2cb4a26af7a925fe4a4bb96c496e4524f952fc267c`, matching `SHA256SUMS.txt`.
+- [x] Release page and README links target the published `v1.1.0` assets.
 
 ## Signing and updates
 
@@ -113,3 +113,13 @@ identity is available.
 V1.1 performs no automatic update checks. Updating remains an explicit user
 action through GitHub Releases. No background network request is introduced by
 the release.
+
+
+## Publication record
+
+- Release: https://github.com/purysho/Witness/releases/tag/v1.1.0
+- Published: 2026-09-19
+- Installer size: 31,615,762 bytes
+- Installer SHA-256: `d092c31bc2888fa8d4d35e2cb4a26af7a925fe4a4bb96c496e4524f952fc267c`
+- Release publication workflow: `35446617835`
+- Publication commit CI: `35446617801` — success
