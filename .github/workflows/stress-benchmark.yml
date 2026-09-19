@@ -23,6 +23,10 @@ on:
         description: "Workspace reopen/query cycles"
         required: true
         default: "5"
+  push:
+    branches: [v1.1]
+    paths:
+      - ".github/stress-trigger-v1.1"
 
 jobs:
   windows-stress:
@@ -38,11 +42,11 @@ jobs:
       - name: Run mixed-format stress benchmark
         run: >
           python tools/stress-workspace.py
-          --files ${{ inputs.files }}
-          --paragraphs ${{ inputs.paragraphs }}
-          --large-every ${{ inputs.large_every }}
-          --large-multiplier ${{ inputs.large_multiplier }}
-          --reopen-cycles ${{ inputs.reopen_cycles }}
+          --files ${{ inputs.files || '2000' }}
+          --paragraphs ${{ inputs.paragraphs || '3' }}
+          --large-every ${{ inputs.large_every || '50' }}
+          --large-multiplier ${{ inputs.large_multiplier || '20' }}
+          --reopen-cycles ${{ inputs.reopen_cycles || '5' }}
           --root stress-run
           --json-out stress-result.json
       - name: Upload stress report
