@@ -122,3 +122,20 @@ def test_unrelated_evidence_is_insufficient(tmp_path):
 
     assert sufficiency.state == SufficiencyState.INSUFFICIENT
     assert sufficiency.query_coverage < 0.25
+
+
+def test_exactly_quarter_query_coverage_is_insufficient(tmp_path):
+    document = tmp_path / "metadata.md"
+    document.write_text(
+        "# Metadata\n\nRequest metadata is required.\n",
+        encoding="utf-8",
+    )
+
+    _retrieval, _reconciliation, sufficiency = _retrieve(
+        tmp_path / "witness-quarter.sqlite3",
+        ((document, "2026-01-01T00:00:00+00:00"),),
+        "What database encryption algorithm is required?",
+    )
+
+    assert sufficiency.query_coverage == 0.25
+    assert sufficiency.state == SufficiencyState.INSUFFICIENT
