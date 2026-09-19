@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import {
+  open as openDialog,
+  save as saveDialog,
+} from "@tauri-apps/plugin-dialog";
 import type {
   AskResult,
   AttackManifestSummary,
@@ -190,6 +193,88 @@ export function App() {
       }
     } catch (reason) {
       setError("Could not open workspace picker: " + String(reason));
+    }
+  }
+
+  async function backupWorkspace() {
+    if (!workspace) {
+      return;
+    }
+    setError(null);
+    try {
+      const stamp = new Date()
+        .toISOString()
+        .slice(0, 19)
+        .replace(/[T:]/g, "-");
+      const selected = await saveDialog({
+        title: "Back up Witness workspace",
+        defaultPath: workspace.path + "-" + stamp + ".witness-backup",
+        filters: [
+          {
+            name: "Witness workspace backup",
+            extensions: ["witness-backup"],
+          },
+        ],
+      });
+      if (typeof selected !== "string") {
+        return;
+      }
+      setBusy(true);
+      const backup = await engine.backupWorkspace(selected);
+      setStatus(
+        "Workspace backup created · " +
+          backup.protected_state_fingerprint.slice(0, 12) +
+          " · " +
+          backup.path,
+      );
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function restoreWorkspaceBackup() {
+    setError(null);
+    try {
+      const backupPath = await openDialog({
+        directory: false,
+        multiple: false,
+        title: "Choose a Witness workspace backup",
+        filters: [
+          {
+            name: "Witness workspace backup",
+            extensions: ["witness-backup"],
+          },
+        ],
+      });
+      if (typeof backupPath !== "string") {
+        return;
+      }
+
+      const destinationPath = await openDialog({
+        directory: true,
+        multiple: false,
+        title: "Choose an empty folder for the restored workspace",
+      });
+      if (typeof destinationPath !== "string") {
+        return;
+      }
+
+      setBusy(true);
+      const restored = await engine.restoreWorkspace(
+        backupPath,
+        destinationPath,
+      );
+      setStatus(
+        "Backup verified · restored fingerprint " +
+          restored.protected_state_fingerprint.slice(0, 12),
+      );
+      await openWorkspacePath(restored.path);
+    } catch (reason) {
+      setError(String(reason));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -831,6 +916,13 @@ export function App() {
               >
                 {workspacePath.trim() ? "Choose another folder" : "Choose folder"}
               </button>
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={restoreWorkspaceBackup}
+              >
+                Restore backup
+              </button>
             </div>
           </section>
         )}
@@ -851,6 +943,20 @@ export function App() {
               </small>
             </div>
             <div className="workspace-health-actions">
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={backupWorkspace}
+              >
+                Backup workspace
+              </button>
+              <button
+                className="secondary"
+                disabled={busy}
+                onClick={restoreWorkspaceBackup}
+              >
+                Restore backup
+              </button>
               <button
                 className="secondary"
                 disabled={busy}

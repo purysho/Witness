@@ -19,9 +19,11 @@ import {
   type SourceVersionDetail,
   type SourceVersionSummary,
   type VisualEvidencePreview,
+  type WorkspaceBackupResult,
   type WorkspaceHealthReport,
   type WorkspaceOpenResult,
   type WorkspaceRepairResult,
+  type WorkspaceRestoreResult,
 } from "../../../../contracts/generated/rpc";
 
 let sequence = 0;
@@ -52,6 +54,13 @@ export const engine = {
     call<WorkspaceHealthReport>("workspace.health"),
   repairWorkspace: () =>
     call<WorkspaceRepairResult>("workspace.repair"),
+  backupWorkspace: (path: string) =>
+    call<WorkspaceBackupResult>("workspace.backup", { path }),
+  restoreWorkspace: (backupPath: string, destinationPath: string) =>
+    call<WorkspaceRestoreResult>("workspace.restore", {
+      backup_path: backupPath,
+      destination_path: destinationPath,
+    }),
   providerSettings: () =>
     call<ProviderSnapshot>("providers.get"),
   loadDemo: () =>

@@ -9,6 +9,8 @@ export interface WorkspaceOpenResult { path:string; database:string; source_vers
 export interface WorkspaceHealthIssue { code:string; severity:"warning"|"error"; repairable:boolean; detail:string; }
 export interface WorkspaceHealthReport { status:"healthy"|"repairable"|"attention"; issues:WorkspaceHealthIssue[]; protected_state_fingerprint:string; counts:Record<string,number>; }
 export interface WorkspaceRepairResult { before:WorkspaceHealthReport; after:WorkspaceHealthReport; actions:string[]; protected_state_unchanged:boolean; }
+export interface WorkspaceBackupResult { path:string; format:"witness-workspace-backup"; format_version:1; database_sha256:string; database_bytes:number; protected_state_fingerprint:string; secrets_persisted:false; }
+export interface WorkspaceRestoreResult extends WorkspaceBackupResult { database:string; }
 export interface ProviderSettings { embedding_dimensions:number; visual_mode:"off"|"hash"; visual_dimensions:number; updated_at:string; }
 export interface ProviderSnapshot {
   settings:ProviderSettings;
