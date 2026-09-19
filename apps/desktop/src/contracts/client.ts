@@ -66,11 +66,15 @@ export const engine = {
   loadDemo: () =>
     call<DemoLoadResult>("demo.load"),
   setProviderSettings: (
+    embeddingMode: "hash" | "sentence-transformers",
+    embeddingModel: string,
     embeddingDimensions: number,
     visualMode: "off" | "hash",
     visualDimensions: number,
   ) =>
     call<ProviderSnapshot>("providers.set", {
+      embedding_mode: embeddingMode,
+      embedding_model: embeddingModel,
       embedding_dimensions: embeddingDimensions,
       visual_mode: visualMode,
       visual_dimensions: visualDimensions,

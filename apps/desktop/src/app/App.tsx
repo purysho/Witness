@@ -456,6 +456,8 @@ export function App() {
   }
 
   async function applyProviderSettings(
+    embeddingMode: "hash" | "sentence-transformers",
+    embeddingModel: string,
     embeddingDimensions: number,
     visualMode: "off" | "hash",
     visualDimensions: number,
@@ -464,6 +466,8 @@ export function App() {
     setError(null);
     try {
       const snapshot = await engine.setProviderSettings(
+        embeddingMode,
+        embeddingModel,
         embeddingDimensions,
         visualMode,
         visualDimensions,
