@@ -52,7 +52,13 @@ def active_source_version_ids(
                 AND current.superseded_by_source_version_id IS NULL
                 AND current.archived_at IS NULL
           )
-        ORDER BY version.source_version_id
+        UNION
+        SELECT DISTINCT chunk.source_version_id
+        FROM indexed_chunks AS chunk
+        LEFT JOIN source_version_metadata AS metadata
+          ON metadata.source_version_id = chunk.source_version_id
+        WHERE metadata.source_version_id IS NULL
+        ORDER BY source_version_id
         """
     ).fetchall()
     return tuple(str(row["source_version_id"]) for row in rows)
