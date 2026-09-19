@@ -1,0 +1,54 @@
+name: Stress Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      files:
+        description: "Number of generated corpus files"
+        required: true
+        default: "2000"
+      paragraphs:
+        description: "Base paragraphs/records per file"
+        required: true
+        default: "3"
+      large_every:
+        description: "Every Nth file becomes a large document (0 disables)"
+        required: true
+        default: "50"
+      large_multiplier:
+        description: "Content multiplier for large documents"
+        required: true
+        default: "20"
+      reopen_cycles:
+        description: "Workspace reopen/query cycles"
+        required: true
+        default: "5"
+
+jobs:
+  windows-stress:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Witness engine
+        run: python -m pip install --upgrade pip -e engine
+      - name: Run mixed-format stress benchmark
+        run: >
+          python tools/stress-workspace.py
+          --files ${{ inputs.files }}
+          --paragraphs ${{ inputs.paragraphs }}
+          --large-every ${{ inputs.large_every }}
+          --large-multiplier ${{ inputs.large_multiplier }}
+          --reopen-cycles ${{ inputs.reopen_cycles }}
+          --root stress-run
+          --json-out stress-result.json
+      - name: Upload stress report
+        uses: actions/upload-artifact@v4
+        with:
+          name: witness-stress-windows-${{ github.run_id }}
+          path: stress-result.json
+          if-no-files-found: error
+          retention-days: 30
