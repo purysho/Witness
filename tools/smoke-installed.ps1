@@ -61,8 +61,13 @@ try {
 }
 finally {
     if ($appProcess -and -not $appProcess.HasExited) {
-        Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
-        $appProcess.WaitForExit(5000) | Out-Null
+        Write-Host "Closing installed Witness desktop normally"
+        $null = $appProcess.CloseMainWindow()
+        if (-not $appProcess.WaitForExit(10000)) {
+            Write-Warning "Witness desktop did not exit after CloseMainWindow; forcing smoke cleanup."
+            Stop-Process -Id $appProcess.Id -Force -ErrorAction SilentlyContinue
+            $appProcess.WaitForExit(5000) | Out-Null
+        }
     }
     Remove-Item -Force $readyFile -ErrorAction SilentlyContinue
     if ($null -eq $previousReadyFile) {
