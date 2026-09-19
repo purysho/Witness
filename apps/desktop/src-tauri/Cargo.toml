@@ -1,6 +1,6 @@
 [package]
 name = "witness-desktop"
-version = "0.1.0"
+version = "1.0.0"
 description = "Witness evidence-first RAG workbench"
 authors = ["Purysho"]
 edition = "2021"
