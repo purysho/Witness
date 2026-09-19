@@ -66,6 +66,26 @@ def _candidate_relevance(
     return int(any(evidence_matches(ref, candidate) for ref in refs))
 
 
+def _unique_ranked_relevance(
+    refs: tuple[GoldEvidenceRef, ...],
+    candidates: list[CandidateMeta],
+) -> list[int]:
+    """Binary relevance where each gold reference earns DCG credit once."""
+
+    matched_gold: set[int] = set()
+    relevance: list[int] = []
+    for candidate in candidates:
+        matches = {
+            index
+            for index, ref in enumerate(refs)
+            if evidence_matches(ref, candidate)
+        }
+        new_matches = matches - matched_gold
+        relevance.append(1 if new_matches else 0)
+        matched_gold.update(matches)
+    return relevance
+
+
 def _ndcg(relevance: list[int], gold_count: int, k: int) -> float:
     if gold_count <= 0:
         return 1.0
@@ -106,13 +126,14 @@ def score_case(
     if gold:
         matched = _match_gold_indices(gold, candidate_meta)
         relevance = [_candidate_relevance(gold, item) for item in candidate_meta]
+        unique_relevance = _unique_ranked_relevance(gold, candidate_meta)
         recall = len(matched) / len(gold)
         precision = sum(relevance[:top_k]) / top_k
         reciprocal_rank = next(
             (1.0 / rank for rank, rel in enumerate(relevance, start=1) if rel),
             0.0,
         )
-        ndcg = _ndcg(relevance, len(gold), top_k)
+        ndcg = _ndcg(unique_relevance, len(gold), top_k)
     else:
         matched = set()
         recall = precision = reciprocal_rank = ndcg = None
