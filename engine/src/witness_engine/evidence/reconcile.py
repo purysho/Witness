@@ -110,28 +110,31 @@ def _clean_token(token: str) -> str:
     return token.strip(".,;:!?()[]{}")
 
 
-def _tokens(text: str) -> set[str]:
+def _surface_tokens(text: str) -> set[str]:
     return {
-        _stem(_clean_token(token))
+        _clean_token(token).casefold()
         for token in _TOKEN_RE.findall(text)
         if _clean_token(token)
     }
 
 
+def _tokens(text: str) -> set[str]:
+    return {_stem(token) for token in _surface_tokens(text)}
+
+
 def _topic_tokens(text: str) -> set[str]:
     values = set()
     for token in _TOKEN_RE.findall(text):
-        cleaned = _clean_token(token)
+        cleaned = _clean_token(token).casefold()
         if not cleaned or _NUMBER_RE.fullmatch(cleaned):
             continue
-        stem = _stem(cleaned)
         if (
-            stem in _STOPWORDS
-            or stem in _NEGATIONS
-            or stem in _POLARITY_TERMS
+            cleaned in _STOPWORDS
+            or cleaned in _NEGATIONS
+            or cleaned in _POLARITY_TERMS
         ):
             continue
-        values.add(stem)
+        values.add(_stem(cleaned))
     return values
 
 
@@ -153,8 +156,8 @@ def _contradiction_reason(left: str, right: str) -> str | None:
     if left_numbers and right_numbers and left_numbers != right_numbers and similarity >= 0.6:
         return "same topic contains incompatible numeric values"
 
-    left_tokens = _tokens(left)
-    right_tokens = _tokens(right)
+    left_tokens = _surface_tokens(left)
+    right_tokens = _surface_tokens(right)
     left_negated = bool(left_tokens & _NEGATIONS)
     right_negated = bool(right_tokens & _NEGATIONS)
     if left_negated != right_negated and similarity >= 0.6:
