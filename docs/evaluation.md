@@ -82,3 +82,42 @@ Phase 7 extends the existing objective metrics rather than defining a separate v
 The fixed lexical, dense, and hybrid modes remain Phase 5 text baselines. Routed mode may execute the visual route when the query contains an explicit visual signal and the workspace has a visual index/provider. Visual candidates then use the same Recall@K, Precision@K, MRR, nDCG, citation precision, and citation coverage calculations because their provenance is represented in the shared retrieval-candidate contract.
 
 This makes a useful regression experiment possible: run the same visual benchmark once with a fixed text-only baseline and once with routed multimodal retrieval, then inspect the metric delta and both traces.
+
+
+## V1.1 fixed quality regression
+
+V1.1 adds the immutable `witness-v1-1-quality-regression-v1` dataset and the
+`tools/quality-baseline.py` runner. The dataset fingerprint is:
+
+```text
+2f427210f2f8349e63ce8a5c3241f53727c0ab4a3e5136f7016a146a61aef513
+```
+
+The fixed corpus fingerprint used for the recorded V1.1 runs is:
+
+```text
+177bfdcc4e5e689fc38b211d265de43e43fd559ef2ccb53ccfbc592134529955
+```
+
+The final routed run (`35439951846`) passed all eight cases:
+
+- Recall@K: 1.0
+- MRR: 1.0
+- nDCG@K: 0.9242
+- citation precision: 1.0
+- citation coverage: 0.8125
+- state accuracy: 1.0
+- abstention correctness: 1.0
+- contradiction handling: 1.0
+- expected-answer fragment accuracy: 1.0
+- unsupported-claim rate: 0.0
+
+Citation coverage remains intentionally stricter than answer correctness: exact
+duplicate sources can provide interchangeable support, while hierarchical
+candidates may cover multiple gold locators through one cited structural
+context. Hierarchical retrieval therefore carries explicit `covered_locators`
+provenance so Lab credits descendant evidence only when that locator is actually
+present in the retrieved structural context.
+
+The quality workflow retains provenance-only ranked-candidate/citation details
+for diagnosis without copying source text into the benchmark report.
