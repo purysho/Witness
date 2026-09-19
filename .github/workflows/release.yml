@@ -76,5 +76,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $assets = Get-ChildItem "apps/desktop/src-tauri/target/release/bundle/nsis/*.exe" | ForEach-Object { $_.FullName }
-          gh release create "$env:GITHUB_REF_NAME" @assets "SHA256SUMS.txt" --generate-notes --title "Witness $env:GITHUB_REF_NAME"
+          $root = (Get-Location).Path
+          $assets = Get-ChildItem "apps/desktop/src-tauri/target/release/bundle/nsis/*.exe" | ForEach-Object {
+            [IO.Path]::GetRelativePath($root, $_.FullName).Replace('\\', '/')
+          }
+          gh release create "$env:GITHUB_REF_NAME" $assets "SHA256SUMS.txt" --generate-notes --title "Witness $env:GITHUB_REF_NAME"
