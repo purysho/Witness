@@ -129,7 +129,7 @@ def test_unrelated_evidence_is_insufficient(tmp_path):
 def test_exactly_quarter_query_coverage_is_insufficient():
     candidate = RetrievalCandidate(
         chunk_id="quarter-coverage",
-        text="Required.",
+        text="database",
         score=1.0,
         rank=1,
         method="fixture",
