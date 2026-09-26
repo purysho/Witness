@@ -216,16 +216,20 @@ jobs:
           pattern: witness-*
           path: dist
           merge-multiple: true
-      - name: Generate SHA-256 checksums
+      - name: Collect files and generate SHA-256 checksums
+        # The Linux artifact keeps its appimage/ and deb/ folders, so flatten
+        # everything into one directory before checksumming and uploading.
         run: |
-          cd dist
+          mkdir release
+          find dist -type f -exec cp {} release/ \;
+          cd release
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
       - name: Publish GitHub release
         run: |
           notes="RELEASE_NOTES_${RELEASE_TAG}.md"
           if [ -f "$notes" ]; then
-            gh release create "$RELEASE_TAG" dist/* --target "$GITHUB_SHA" --notes-file "$notes" --title "Witness $RELEASE_TAG"
+            gh release create "$RELEASE_TAG" release/* --target "$GITHUB_SHA" --notes-file "$notes" --title "Witness $RELEASE_TAG"
           else
-            gh release create "$RELEASE_TAG" dist/* --target "$GITHUB_SHA" --generate-notes --title "Witness $RELEASE_TAG"
+            gh release create "$RELEASE_TAG" release/* --target "$GITHUB_SHA" --generate-notes --title "Witness $RELEASE_TAG"
           fi
