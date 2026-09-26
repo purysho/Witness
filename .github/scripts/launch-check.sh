@@ -39,6 +39,9 @@ else
   echo "$bin is running${expect:+ and $expect started}"
 fi
 
+if [ -n "${LAUNCH_SCREENSHOT:-}" ] && [ "$(uname)" = "Darwin" ]; then
+  screencapture -x "$LAUNCH_SCREENSHOT" || true
+fi
 pkill -P "$pid" 2>/dev/null; kill "$pid" 2>/dev/null
 [ -n "$expect" ] && pkill -x "$expect" 2>/dev/null
 [ -n "${xvfb_pid:-}" ] && kill "$xvfb_pid" 2>/dev/null

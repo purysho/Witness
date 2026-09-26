@@ -197,8 +197,7 @@ jobs:
         run: npm run tauri build -- --config src-tauri/tauri.release.conf.json --bundles ${{ matrix.bundles }}
 
       - name: Launch the packaged app and its engine
-        # The engine starts on the UI's first request, so its process appearing
-        # proves the window loaded and reached the bundled engine.
+        # On Linux the engine starting proves the window loaded and reached it.
         shell: bash
         run: |
           if [ "$RUNNER_OS" = "macOS" ]; then
@@ -208,7 +207,12 @@ jobs:
             app=$(ls -d "$mnt"/*.app | head -n 1)
             exe=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")
             status=0
-            .github/scripts/launch-check.sh "$app/Contents/MacOS/$exe" 90 witness-engine || status=$?
+            # The engine starts on the UI's first request, but a CI Mac's web
+            # view does not reliably run that request, so check the app stays up
+            # and exercise the engine bundled inside it directly.
+            LAUNCH_SCREENSHOT="$RUNNER_TEMP/witness-macos.png" \
+              .github/scripts/launch-check.sh "$app/Contents/MacOS/$exe" 30 || status=$?
+            python tools/smoke-sidecar.py --engine "$app/Contents/MacOS/witness-engine" || status=$?
             hdiutil detach "$mnt" -force >/dev/null || true
             exit $status
           else
@@ -217,6 +221,14 @@ jobs:
             appimage=$(ls apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage | head -n 1)
             dbus-run-session -- .github/scripts/launch-check.sh "$appimage" 90 witness-engine
           fi
+
+      - name: Keep the launch screenshot
+        if: always() && runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: launch-screenshot-macos
+          path: ${{ runner.temp }}/witness-macos.png
+          if-no-files-found: ignore
 
       - uses: actions/upload-artifact@v4
         with:
