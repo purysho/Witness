@@ -1,3 +1,14 @@
+# Code signing is optional and switches on by itself once these repository
+# secrets exist (Settings -> Secrets and variables -> Actions):
+#   Windows (Azure Artifact Signing): AZURE_TENANT_ID, AZURE_CLIENT_ID,
+#     AZURE_CLIENT_SECRET, AZURE_SIGNING_ENDPOINT, AZURE_SIGNING_ACCOUNT,
+#     AZURE_CERT_PROFILE
+#   macOS (Developer ID + notarization): APPLE_CERT_P12, APPLE_CERT_PASSWORD,
+#     APPLE_SIGNING_IDENTITY, APPLE_ID, APPLE_TEAM_ID, APPLE_APP_PASSWORD
+# Windows signs the NSIS installer; macOS signing and notarization is done by
+# the Tauri bundler.
+# Without them, builds are published unsigned, as before.
+
 name: Release
 
 on:
@@ -17,6 +28,8 @@ permissions:
 jobs:
   windows-package:
     runs-on: windows-latest
+    env:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -62,6 +75,22 @@ jobs:
         working-directory: apps/desktop
         run: npm run tauri build -- --config src-tauri/tauri.release.conf.json
 
+      - name: Sign Windows installer
+        # Runs only once the Artifact Signing secrets exist; see the header of this file.
+        if: env.AZURE_CLIENT_ID != ''
+        uses: azure/artifact-signing-action@v2
+        with:
+          azure-tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          azure-client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          azure-client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
+          endpoint: ${{ secrets.AZURE_SIGNING_ENDPOINT }}
+          signing-account-name: ${{ secrets.AZURE_SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ secrets.AZURE_CERT_PROFILE }}
+          files-folder: ${{ github.workspace }}\apps\desktop\src-tauri\target\release\bundle\nsis
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
       - name: Smoke installed Windows package
         shell: pwsh
         run: |
@@ -105,6 +134,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     env:
       NO_STRIP: 'true'
+      APPLE_CERT_P12: ${{ secrets.APPLE_CERT_P12 }}
+      APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+      APPLE_SIGNING_IDENTITY_SECRET: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+      APPLE_ID_SECRET: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID_SECRET: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -142,6 +177,20 @@ jobs:
       - name: Install desktop dependencies
         working-directory: apps/desktop
         run: npm install --no-audit --no-fund
+
+      - name: Enable macOS signing and notarization
+        # Tauri treats an empty APPLE_CERTIFICATE as a certificate to import, so
+        # these are only exported when the secrets exist.
+        if: runner.os == 'macOS' && env.APPLE_CERT_P12 != ''
+        run: |
+          {
+            echo "APPLE_CERTIFICATE<<CERT_EOF"; echo "$APPLE_CERT_P12"; echo "CERT_EOF"
+            echo "APPLE_CERTIFICATE_PASSWORD=$APPLE_CERT_PASSWORD"
+            echo "APPLE_SIGNING_IDENTITY=$APPLE_SIGNING_IDENTITY_SECRET"
+            echo "APPLE_ID=$APPLE_ID_SECRET"
+            echo "APPLE_PASSWORD=$APPLE_APP_PASSWORD"
+            echo "APPLE_TEAM_ID=$APPLE_TEAM_ID_SECRET"
+          } >> "$GITHUB_ENV"
 
       - name: Build ${{ matrix.platform }} bundles
         working-directory: apps/desktop
