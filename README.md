@@ -12,30 +12,28 @@ The project is designed to make the hidden parts of retrieval-augmented generati
 
 ## Download
 
-**Witness v1.1.0 is released for Windows x64.**
+**Witness v1.1.1 is released for Windows, macOS and Linux.**
 
-- [Download the Windows installer](https://github.com/purysho/Witness/releases/download/v1.1.0/Witness_1.1.0_x64-setup.exe)
-- [SHA256SUMS.txt](https://github.com/purysho/Witness/releases/download/v1.1.0/SHA256SUMS.txt)
-- [Release page](https://github.com/purysho/Witness/releases/tag/v1.1.0)
-- [Release notes](RELEASE_NOTES_v1.1.0.md)
+| Platform | Download |
+|---|---|
+| Windows 10/11 (x64) | [Witness_1.1.1_x64-setup.exe](https://github.com/purysho/Witness/releases/download/v1.1.1/Witness_1.1.1_x64-setup.exe) — current-user installer |
+| macOS (Apple Silicon) | [Witness_1.1.1_aarch64.dmg](https://github.com/purysho/Witness/releases/download/v1.1.1/Witness_1.1.1_aarch64.dmg) |
+| Linux (x86_64) | [Witness_1.1.1_amd64.AppImage](https://github.com/purysho/Witness/releases/download/v1.1.1/Witness_1.1.1_amd64.AppImage) · [Witness_1.1.1_amd64.deb](https://github.com/purysho/Witness/releases/download/v1.1.1/Witness_1.1.1_amd64.deb) |
 
-The installer is a current-user NSIS package and includes the frozen Witness engine, so Python and a developer environment are not required.
+- [SHA256SUMS.txt](https://github.com/purysho/Witness/releases/download/v1.1.1/SHA256SUMS.txt) · [Release page](https://github.com/purysho/Witness/releases/tag/v1.1.1) · [Release notes](RELEASE_NOTES_v1.1.1.md)
 
-Verify the downloaded installer in PowerShell:
+Every package includes the frozen Witness engine, so Python and a developer environment are not required. The builds are not yet code-signed: Windows SmartScreen may ask you to confirm the installer, and macOS may need you to Control-click the app and choose **Open** the first time.
+
+Verify a download against the release's `SHA256SUMS.txt`:
 
 ```powershell
-(Get-FileHash .\Witness_1.1.0_x64-setup.exe -Algorithm SHA256).Hash.ToLower()
+(Get-FileHash .\Witness_1.1.1_x64-setup.exe -Algorithm SHA256).Hash.ToLower()
 ```
 
-Expected SHA-256:
-
-```text
-d092c31bc2888fa8d4d35e2cb4a26af7a925fe4a4bb96c496e4524f952fc267c
+```sh
+shasum -a 256 Witness_1.1.1_aarch64.dmg        # macOS
+sha256sum Witness_1.1.1_amd64.AppImage          # Linux
 ```
-
-Compare it with the value in the release's `SHA256SUMS.txt`.
-
-The v1.1.0 installer is not code-signed yet, so Windows may show a reputation warning. A signing/SmartScreen strategy is documented for a future trusted signing identity; V1.1 keeps updates explicit and manual.
 
 **Updates are manual.** Witness does not contact GitHub or another update service automatically. New releases are downloaded explicitly from GitHub Releases and can be verified with the published SHA-256 checksums. Automatic updating remains disabled until a signed update channel can preserve the same local-first and fail-closed guarantees.
 
