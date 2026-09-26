@@ -1,7 +1,12 @@
-name: Release Windows
+name: Release
 
 on:
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Publish as this tag (for example v1.1.1). Leave empty to build without publishing.'
+        required: false
+        default: ''
   push:
     tags:
       - 'v*'
@@ -24,9 +29,11 @@ jobs:
 
       - name: Verify release version metadata
         shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.version }}
         run: |
-          if ($env:GITHUB_REF -like 'refs/tags/v*') {
-            python tools/check-version-metadata.py --tag "$env:GITHUB_REF_NAME"
+          if ($env:RELEASE_TAG) {
+            python tools/check-version-metadata.py --tag "$env:RELEASE_TAG"
           } else {
             python tools/check-version-metadata.py
           }
@@ -76,25 +83,100 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: witness-windows-${{ github.ref_name }}
-          path: |
-            apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
-            SHA256SUMS.txt
+          name: witness-windows
+          path: apps/desktop/src-tauri/target/release/bundle/nsis/*.exe
           if-no-files-found: error
 
-      - name: Publish tagged GitHub release
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  unix-package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: macos
+            bundles: dmg
+            artifacts: apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+          - os: ubuntu-22.04
+            platform: linux
+            bundles: appimage,deb
+            artifacts: |
+              apps/desktop/src-tauri/target/release/bundle/appimage/*.AppImage
+              apps/desktop/src-tauri/target/release/bundle/deb/*.deb
+    runs-on: ${{ matrix.os }}
+    env:
+      NO_STRIP: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux WebView and bundling dependencies
+        if: runner.os == 'Linux'
         run: |
-          $root = (Get-Location).Path
-          $assets = Get-ChildItem "apps/desktop/src-tauri/target/release/bundle/nsis/*.exe" | ForEach-Object {
-            [IO.Path]::GetRelativePath($root, $_.FullName).Replace('\\', '/')
-          }
-          $notesFile = "RELEASE_NOTES_$env:GITHUB_REF_NAME.md"
-          if (Test-Path $notesFile) {
-            gh release create "$env:GITHUB_REF_NAME" $assets "SHA256SUMS.txt" --notes-file $notesFile --title "Witness $env:GITHUB_REF_NAME"
-          } else {
-            gh release create "$env:GITHUB_REF_NAME" $assets "SHA256SUMS.txt" --generate-notes --title "Witness $env:GITHUB_REF_NAME"
-          }
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Verify release version metadata
+        env:
+          RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.version }}
+        run: |
+          if [ -n "$RELEASE_TAG" ]; then python tools/check-version-metadata.py --tag "$RELEASE_TAG"; else python tools/check-version-metadata.py; fi
+
+      - name: Install frozen-engine tooling
+        run: python -m pip install --upgrade pip -e "engine[build]"
+
+      - name: Build frozen Witness engine
+        run: python tools/build-sidecar.py
+
+      - name: Smoke frozen engine before packaging
+        run: |
+          sidecar=$(ls apps/desktop/src-tauri/binaries/witness-engine-* | head -n 1)
+          test -n "$sidecar" || { echo "Frozen Witness engine was not created"; exit 1; }
+          python tools/smoke-sidecar.py --engine "$sidecar"
+
+      - name: Install desktop dependencies
+        working-directory: apps/desktop
+        run: npm install --no-audit --no-fund
+
+      - name: Build ${{ matrix.platform }} bundles
+        working-directory: apps/desktop
+        run: npm run tauri build -- --config src-tauri/tauri.release.conf.json --bundles ${{ matrix.bundles }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: witness-${{ matrix.platform }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error
+
+  publish:
+    needs: [windows-package, unix-package]
+    if: github.ref_type == 'tag' || inputs.version != ''
+    runs-on: ubuntu-latest
+    env:
+      RELEASE_TAG: ${{ github.ref_type == 'tag' && github.ref_name || inputs.version }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: witness-*
+          path: dist
+          merge-multiple: true
+      - name: Generate SHA-256 checksums
+        run: |
+          cd dist
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Publish GitHub release
+        run: |
+          notes="RELEASE_NOTES_${RELEASE_TAG}.md"
+          if [ -f "$notes" ]; then
+            gh release create "$RELEASE_TAG" dist/* --target "$GITHUB_SHA" --notes-file "$notes" --title "Witness $RELEASE_TAG"
+          else
+            gh release create "$RELEASE_TAG" dist/* --target "$GITHUB_SHA" --generate-notes --title "Witness $RELEASE_TAG"
+          fi
