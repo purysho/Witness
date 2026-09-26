@@ -6,6 +6,7 @@ import type {
   LabComparison,
   RetrievalMode,
 } from "../../../../../contracts/generated/rpc";
+import { examplePath } from "../../app/examplePath";
 
 const modes: RetrievalMode[] = ["lexical", "dense", "hybrid", "routed"];
 
@@ -96,7 +97,7 @@ export function LabView({
             <input
               value={datasetPath}
               onChange={(event) => setDatasetPath(event.target.value)}
-              placeholder="C:\Witness\benchmarks\core-v1.json"
+              placeholder={examplePath("Witness", "benchmarks", "core-v1.json")}
             />
           </label>
           <button

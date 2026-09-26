@@ -12,27 +12,27 @@ The project is designed to make the hidden parts of retrieval-augmented generati
 
 ## Download
 
-**Witness v1.1.1 is released for Windows, macOS and Linux.**
+**Witness v1.1.2 is released for Windows, macOS and Linux.**
 
 | Platform | Download |
 |---|---|
-| Windows 10/11 (x64) | [Witness_1.1.1_x64-setup.exe](https://github.com/purysho/Witness/releases/download/v1.1.1/Witness_1.1.1_x64-setup.exe) — current-user installer |
-| macOS (Apple Silicon) | [Witness_1.1.1_aarch64.dmg](https://github.com/purysho/Witness/releases/download/v1.1.1/Witness_1.1.1_aarch64.dmg) |
-| Linux (x86_64) | [Witness_1.1.1_amd64.AppImage](https://github.com/purysho/Witness/releases/download/v1.1.1/Witness_1.1.1_amd64.AppImage) · [Witness_1.1.1_amd64.deb](https://github.com/purysho/Witness/releases/download/v1.1.1/Witness_1.1.1_amd64.deb) |
+| Windows 10/11 (x64) | [Witness_1.1.2_x64-setup.exe](https://github.com/purysho/Witness/releases/download/v1.1.2/Witness_1.1.2_x64-setup.exe) — current-user installer |
+| macOS (Apple Silicon) | [Witness_1.1.2_aarch64.dmg](https://github.com/purysho/Witness/releases/download/v1.1.2/Witness_1.1.2_aarch64.dmg) |
+| Linux (x86_64) | [Witness_1.1.2_amd64.AppImage](https://github.com/purysho/Witness/releases/download/v1.1.2/Witness_1.1.2_amd64.AppImage) · [Witness_1.1.2_amd64.deb](https://github.com/purysho/Witness/releases/download/v1.1.2/Witness_1.1.2_amd64.deb) |
 
-- [SHA256SUMS.txt](https://github.com/purysho/Witness/releases/download/v1.1.1/SHA256SUMS.txt) · [Release page](https://github.com/purysho/Witness/releases/tag/v1.1.1) · [Release notes](RELEASE_NOTES_v1.1.1.md)
+- [SHA256SUMS.txt](https://github.com/purysho/Witness/releases/download/v1.1.2/SHA256SUMS.txt) · [Release page](https://github.com/purysho/Witness/releases/tag/v1.1.2) · [Release notes](RELEASE_NOTES_v1.1.2.md)
 
 Every package includes the frozen Witness engine, so Python and a developer environment are not required. The builds are not yet code-signed: Windows SmartScreen may ask you to confirm the installer, and macOS may need you to Control-click the app and choose **Open** the first time.
 
 Verify a download against the release's `SHA256SUMS.txt`:
 
 ```powershell
-(Get-FileHash .\Witness_1.1.1_x64-setup.exe -Algorithm SHA256).Hash.ToLower()
+(Get-FileHash .\Witness_1.1.2_x64-setup.exe -Algorithm SHA256).Hash.ToLower()
 ```
 
 ```sh
-shasum -a 256 Witness_1.1.1_aarch64.dmg        # macOS
-sha256sum Witness_1.1.1_amd64.AppImage          # Linux
+shasum -a 256 Witness_1.1.2_aarch64.dmg        # macOS
+sha256sum Witness_1.1.2_amd64.AppImage          # Linux
 ```
 
 **Updates are manual.** Witness does not contact GitHub or another update service automatically. New releases are downloaded explicitly from GitHub Releases and can be verified with the published SHA-256 checksums. Automatic updating remains disabled until a signed update channel can preserve the same local-first and fail-closed guarantees.

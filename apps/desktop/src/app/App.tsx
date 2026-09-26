@@ -29,6 +29,7 @@ import { LibraryPanel } from "../features/library/LibraryPanel";
 import { ProviderPanel } from "../features/providers/ProviderPanel";
 import { TraceView } from "../features/trace/TraceView";
 import { VisualEvidenceViewer } from "../features/visual/VisualEvidenceViewer";
+import { examplePath } from "./examplePath";
 
 type Tab = "ask" | "trace" | "graph" | "lab" | "attack";
 
@@ -835,7 +836,7 @@ export function App() {
             <input
               value={workspacePath}
               onChange={(event) => setWorkspacePath(event.target.value)}
-              placeholder="C:\Witness\Research.witness"
+              placeholder={examplePath("Witness", "Research.witness")}
             />
           </label>
           <div className="workspace-actions">

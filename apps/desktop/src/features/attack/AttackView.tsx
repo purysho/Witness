@@ -7,6 +7,7 @@ import type {
   EvalDatasetSummary,
   RetrievalMode,
 } from "../../../../../contracts/generated/rpc";
+import { examplePath } from "../../app/examplePath";
 
 const modes: RetrievalMode[] = ["lexical", "dense", "hybrid", "routed"];
 
@@ -92,7 +93,7 @@ export function AttackView({
             <input
               value={manifestPath}
               onChange={(event) => setManifestPath(event.target.value)}
-              placeholder="C:\\Witness\\attacks\\prompt-injection.json"
+              placeholder={examplePath("Witness", "attacks", "prompt-injection.json")}
             />
           </label>
           <button
