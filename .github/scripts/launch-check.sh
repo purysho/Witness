@@ -22,15 +22,21 @@ fi
 
 "$bin" >"$log" 2>&1 &
 pid=$!
-sleep "$wait_s"
+# With an expected helper, stop waiting as soon as it appears.
+for _ in $(seq "$wait_s"); do
+  sleep 1
+  kill -0 "$pid" 2>/dev/null || break
+  [ -n "$expect" ] && pgrep -x "$expect" >/dev/null && break
+done
 
 status=0
 if ! kill -0 "$pid" 2>/dev/null; then
   echo "::error::$bin exited within ${wait_s}s"; cat "$log"; status=1
 elif [ -n "$expect" ] && ! pgrep -x "$expect" >/dev/null; then
-  echo "::error::$bin is running but $expect did not start"; cat "$log"; status=1
+  echo "::error::$bin is running but $expect did not start"; cat "$log"
+  ps -eo pid,ppid,comm,args | grep -v " ps -eo" | tail -n 40; status=1
 else
-  echo "$bin is still running after ${wait_s}s"
+  echo "$bin is running${expect:+ and $expect started}"
 fi
 
 pkill -P "$pid" 2>/dev/null; kill "$pid" 2>/dev/null
